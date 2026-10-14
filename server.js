@@ -1,12 +1,12 @@
 // Field Twin Violet API v1
-// RED PHONE: photo reader and archive relay for Field Twin Violet. Holds the Anthropic key so the phone never does.
-// Endpoints: GET /, GET /health, POST /extract, POST /archive
+// RED PHONE: photo reader for Field Twin Violet. Holds the Anthropic key so the phone never does.
+// RED PHONE: Dropbox archive removed, photos live in the Supabase violet-photos bucket.
+// Endpoints: GET /, GET /health, POST /extract
 import express from "express";
 import cors from "cors";
 import crypto from "node:crypto";
 import { redis } from "./redis.js";
 import { visionReady, extractFromImage } from "./vision.js";
-import { dropboxReady, archivePhoto } from "./dropbox.js";
 import { setupDatabase, schemaState } from "./db.js";
 
 const app = express();
@@ -52,7 +52,7 @@ function parseImage(dataUrl) {
 const wrap = (handler) => (req, res, next) => handler(req, res).catch(next);
 
 app.get("/", (req, res) => {
-  res.json({ name: "field-twin-violet-api", version: "1.0.0", endpoints: ["/health", "/extract", "/archive"] });
+  res.json({ name: "field-twin-violet-api", version: "1.0.0", endpoints: ["/health", "/extract"] });
 });
 
 app.get(
@@ -71,7 +71,6 @@ app.get(
       keyConfigured: visionReady(),
       tokenConfigured: Boolean(API_TOKEN),
       redis: redisState,
-      dropbox: dropboxReady() ? "ready" : "not set",
       schema: schemaState.status,
       schemaFailures: schemaState.failed,
     });
@@ -103,22 +102,6 @@ app.post(
     const result = await extractFromImage({ ...img, barcodes });
     if (redis) await redis.set(cacheKey, JSON.stringify(result), "EX", CACHE_DAYS * 86400).catch(() => {});
     res.json({ result, cached: false });
-  })
-);
-
-app.post(
-  "/archive",
-  requireToken,
-  wrap(async (req, res) => {
-    if (!dropboxReady()) return res.status(503).json({ error: "dropbox not set up" });
-    const img = parseImage(req.body && req.body.image);
-    const path = String((req.body && req.body.path) || "");
-    if (!img) return res.status(400).json({ error: "image must be a base64 data URL" });
-    if (!/^[A-Za-z0-9/_.-]{5,200}$/.test(path) || path.includes("..")) {
-      return res.status(400).json({ error: "bad path" });
-    }
-    await archivePhoto(path, Buffer.from(img.base64, "base64"));
-    res.json({ ok: true });
   })
 );
 
