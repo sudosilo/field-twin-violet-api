@@ -11,7 +11,7 @@ export const pool = process.env.DATABASE_URL
 
 export const schemaState = { status: pool ? "pending" : "no DATABASE_URL", failed: [] };
 
-const STATEMENTS = [
+export const STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS public.violet_holders (
      id UUID PRIMARY KEY,
      owner UUID NOT NULL DEFAULT auth.uid() REFERENCES auth.users(id) ON DELETE CASCADE,
