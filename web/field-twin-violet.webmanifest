@@ -1,0 +1,10 @@
+{
+  "name": "Field Twin Violet",
+  "short_name": "Violet",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6efe6",
+  "theme_color": "#f3e7da",
+  "icons": [{ "src": "/field-twin-violet-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

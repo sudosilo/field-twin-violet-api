@@ -1,0 +1,6 @@
+{
+  "rewrites": [{ "source": "/", "destination": "/field-twin-violet-v1.html" }],
+  "headers": [
+    { "source": "/field-twin-violet-sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] }
+  ]
+}
