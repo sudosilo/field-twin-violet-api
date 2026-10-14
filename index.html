@@ -1189,9 +1189,16 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     ev.preventDefault();
     const f = ev.target;
     if (f.id === "loginForm") {
-      const { data, error } = await sb.auth.signInWithPassword({ email: f.email.value.trim(), password: f.password.value });
-      if (error) return renderLogin(error.message);
-      await startUser(data.user);
+      const btn = f.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.textContent = "Signing in";
+      try {
+        const { data, error } = await sb.auth.signInWithPassword({ email: f.email.value.trim(), password: f.password.value });
+        if (error) return renderLogin(error.message === "Invalid login credentials" ? "That email and password do not match." : error.message);
+        await startUser(data.user);
+      } catch (err) {
+        renderLogin("Sign in failed: " + (err.message || err));
+      }
     } else if (f.id === "holderForm") {
       const name = f.name.value.trim();
       if (!name) return;
