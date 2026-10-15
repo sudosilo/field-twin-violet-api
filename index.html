@@ -98,6 +98,7 @@
 </style>
 </head>
 <body>
+<script src="field-twin-violet-v3-config.js"></script>
 <div class="top">
 <header><h1>Field Twin Violet</h1><span id="status"></span></header>
 <nav id="nav" hidden>
@@ -140,7 +141,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   const SUPABASE_KEY = "sb_publishable_iFsIWHo1XN6bO6S5z5vJEg_k6IRq94z";
   const BUCKET = "violet-photos";
   const LOW_CONFIDENCE = 0.8;
-  const DEFAULT_API = "https://field-twin-violet-api-production.up.railway.app";
+  const DEFAULT_API = window.FTV_API || "https://field-twin-violet-api-production.up.railway.app";
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   const ACTIONS = {
