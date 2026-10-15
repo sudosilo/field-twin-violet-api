@@ -94,13 +94,16 @@
   .pill.on { background: var(--accent); color: #fff; }
   .btn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
   .back { margin: 4px 0 2px; }
+  .maplink { font-size: 13px; font-weight: 700; color: var(--accent); text-decoration: none; border: 1px solid var(--accent2); border-radius: 99px; padding: 4px 10px; background: #fff; white-space: nowrap; }
+  .framed .maplink { display: none; }
   #vendorFilter { margin-top: 8px; }
 </style>
 </head>
 <body>
+<script>if (window.top !== window.self) document.documentElement.classList.add("framed");</script>
 <script src="field-twin-violet-v3-config.js"></script>
 <div class="top">
-<header><h1>Field Twin Violet</h1><span id="status"></span></header>
+<header><h1>Field Twin Violet</h1><span id="status"></span><a id="tealLink" class="maplink" href="https://field-twin-teal.vercel.app/">Field map</a></header>
 <nav id="nav" hidden>
   <button data-tab="home">Home</button>
   <button data-tab="items">Items</button>
