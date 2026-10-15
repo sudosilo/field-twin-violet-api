@@ -1,5 +1,5 @@
 // Field Twin Violet API v1
-// RED PHONE: archive copy of every photo in Dropbox, using a long lived refresh token.
+// BLUE PHONE: archive copy of every photo in Dropbox, using a long lived refresh token.
 const KEY = process.env.DROPBOX_APP_KEY;
 const SECRET = process.env.DROPBOX_APP_SECRET;
 const REFRESH = process.env.DROPBOX_REFRESH_TOKEN;

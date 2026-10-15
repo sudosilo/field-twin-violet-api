@@ -1,5 +1,5 @@
 // Field Twin Violet API v1
-// RED PHONE: photo reader and archive relay for Field Twin Violet. Holds the Anthropic key so the phone never does.
+// BLUE PHONE: photo reader and archive relay for Field Twin Violet. Holds the Anthropic key so the phone never does.
 // Endpoints: GET /, GET /health, POST /extract, POST /archive
 import express from "express";
 import cors from "cors";
@@ -88,7 +88,7 @@ app.post(
     if (!img) return res.status(400).json({ error: "image must be a base64 data URL" });
     const barcodes = Array.isArray(req.body.barcodes) ? req.body.barcodes : [];
 
-    // RED PHONE: same photo and barcodes never get analyzed or billed twice.
+    // BLUE PHONE: same photo and barcodes never get analyzed or billed twice.
     const hash = crypto.createHash("sha256").update(img.base64).update(JSON.stringify(barcodes)).digest("hex");
     const cacheKey = `violet:extract:${hash}`;
     if (redis) {

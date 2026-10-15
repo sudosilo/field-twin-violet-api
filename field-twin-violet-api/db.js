@@ -1,5 +1,5 @@
 // Field Twin Violet API v1
-// RED PHONE: builds the Violet tables, row level security, and the photo bucket in the shared Supabase project.
+// BLUE PHONE: builds the Violet tables, row level security, and the photo bucket in the shared Supabase project.
 // Runs once at boot when DATABASE_URL is set. Every statement is safe to run again.
 import pg from "pg";
 

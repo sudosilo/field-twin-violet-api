@@ -1,33 +1,35 @@
 <!doctype html>
 <!-- Field Twin Violet v1 -->
-<!-- RED PHONE: single file build of the phone app for field-twin-violet-api. Built by Claude Code in the cloud session for Red Phone. -->
-<!-- RED PHONE: Supabase and ZXing are inlined below so this one file runs on its own. -->
+<!-- BLUE PHONE: single file build of the phone app for field-twin-violet-api. Built by Claude Code in the cloud session for Blue Phone. -->
+<!-- BLUE PHONE: Supabase and ZXing are inlined below so this one file runs on its own. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f3e7da">
+<meta name="theme-color" content="#e3edf9">
+<meta name="color-scheme" content="light only">
 <title>Field Twin Violet</title>
-<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NiA5NiI+PHJlY3Qgd2lkdGg9Ijk2IiBoZWlnaHQ9Ijk2IiByeD0iMjAiIGZpbGw9IiNmNmVmZTYiLz48cmVjdCB4PSIyMiIgeT0iMzAiIHdpZHRoPSI1MiIgaGVpZ2h0PSI0MiIgcng9IjYiIGZpbGw9IiNiODNhMmIiLz48cmVjdCB4PSIyMiIgeT0iMjIiIHdpZHRoPSI1MiIgaGVpZ2h0PSIxNCIgcng9IjUiIGZpbGw9IiNkOTc3MmYiLz48cmVjdCB4PSI0MCIgeT0iNDQiIHdpZHRoPSIxNiIgaGVpZ2h0PSI2IiByeD0iMyIgZmlsbD0iI2Y2ZWZlNiIvPjwvc3ZnPgo=" type="image/svg+xml">
+<link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NiA5NiI+PHJlY3Qgd2lkdGg9Ijk2IiBoZWlnaHQ9Ijk2IiByeD0iMjAiIGZpbGw9IiNlZWY0ZmIiLz48cmVjdCB4PSIyMiIgeT0iMzAiIHdpZHRoPSI1MiIgaGVpZ2h0PSI0MiIgcng9IjYiIGZpbGw9IiMxZjVmYmYiLz48cmVjdCB4PSIyMiIgeT0iMjIiIHdpZHRoPSI1MiIgaGVpZ2h0PSIxNCIgcng9IjUiIGZpbGw9IiM0ZjhmZTYiLz48cmVjdCB4PSI0MCIgeT0iNDQiIHdpZHRoPSIxNiIgaGVpZ2h0PSI2IiByeD0iMyIgZmlsbD0iI2VlZjRmYiIvPjwvc3ZnPgo=" type="image/svg+xml">
 <style>
   :root {
-    --bg: #f6efe6; --card: #fffaf3; --line: #e3d5c4; --text: #3b2a20; --muted: #7d6656;
-    --accent: #b83a2b; --accent2: #d9772f; --ok: #3f7d4e; --warn: #fff0c2; --warnline: #e3b54a;
-    --chip: #efe2d2; --bad: #fbe0dc;
+    --bg: #eef4fb; --card: #ffffff; --line: #cfdcec; --text: #1c2b3d; --muted: #5a6d85;
+    --accent: #1f5fbf; --accent2: #4f8fe6; --ok: #3f7d4e; --warn: #fff0c2; --warnline: #e3b54a;
+    --chip: #e2ecf8; --bad: #fbe0dc; --errtext: #b3261e; --bar: #e3edf9;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  body { padding-bottom: 76px; }
-  header { position: sticky; top: 0; z-index: 5; background: #f3e7da; border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; align-items: center; gap: 10px; }
+  body { padding-bottom: 24px; }
+  .top { position: sticky; top: 0; z-index: 5; background: var(--bar); border-bottom: 2px solid var(--accent); }
+  header { padding: 10px 16px 6px; display: flex; align-items: center; gap: 10px; }
   header h1 { font-size: 17px; margin: 0; flex: 1; color: var(--accent); }
   .pill { font-size: 12px; padding: 3px 8px; border-radius: 99px; background: var(--chip); color: var(--muted); white-space: nowrap; }
-  .pill.off { background: var(--bad); color: var(--accent); }
+  .pill.off { background: var(--bad); color: var(--errtext); }
   .pill.demo { background: var(--warn); color: #7a5600; }
   main { padding: 12px 16px; max-width: 760px; margin: 0 auto; }
-  nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #f3e7da; border-top: 1px solid var(--line); z-index: 5; padding-bottom: env(safe-area-inset-bottom); }
+  nav { display: flex; overflow-x: auto; padding: 0 8px; }
   nav[hidden] { display: none; }
-  nav button { flex: 1; border: 0; background: none; padding: 10px 2px 12px; font-size: 13px; color: var(--muted); }
-  nav button.on { color: var(--accent); font-weight: 700; box-shadow: inset 0 3px 0 var(--accent); }
+  nav button { flex: 1; border: 0; background: none; padding: 8px 4px 10px; font-size: 14px; color: var(--muted); white-space: nowrap; }
+  nav button.on { color: var(--accent); font-weight: 700; box-shadow: inset 0 -3px 0 var(--accent); }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 10px 0; }
   h2 { font-size: 17px; margin: 18px 0 6px; }
   h3 { font-size: 15px; margin: 12px 0 4px; }
@@ -46,7 +48,7 @@
   .types button { padding: 10px 4px; font-size: 14px; }
   .types button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
   .muted { color: var(--muted); font-size: 13px; }
-  .err { color: var(--accent); font-size: 14px; margin: 6px 0; }
+  .err { color: var(--errtext); font-size: 14px; margin: 6px 0; }
   .list > div { padding: 10px 0; border-bottom: 1px solid var(--line); }
   .list > div:last-child { border-bottom: 0; }
   .tap { cursor: pointer; }
@@ -64,11 +66,11 @@
   .photos { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
   .preview { max-width: 100%; max-height: 260px; border-radius: 10px; display: block; margin: 8px 0; }
   .conflict { background: var(--bad); border-color: #e9b3aa; }
-  #modal { position: fixed; inset: 0; background: rgba(120, 95, 75, .35); display: none; z-index: 10; overflow: auto; padding: 24px 12px; }
+  #modal { position: fixed; inset: 0; background: rgba(28, 43, 61, .35); display: none; z-index: 10; overflow: auto; padding: 24px 12px; }
   #modal.open { display: block; }
   #modal .sheet { background: var(--bg); border-radius: 14px; max-width: 700px; margin: 0 auto; padding: 14px 16px; }
   #modal img.full { width: 100%; border-radius: 10px; margin-top: 8px; }
-  #toast { position: fixed; left: 16px; right: 16px; bottom: 86px; background: #fff3dc; border: 1px solid var(--warnline); color: var(--text); padding: 10px 12px; border-radius: 10px; display: none; z-index: 20; text-align: center; }
+  #toast { position: fixed; left: 16px; right: 16px; bottom: 24px; background: #fff; border: 1px solid var(--accent2); color: var(--text); padding: 10px 12px; border-radius: 10px; display: none; z-index: 20; text-align: center; }
   .login { max-width: 420px; margin: 40px auto; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); margin: 0; }
@@ -79,8 +81,8 @@
 </style>
 </head>
 <body>
+<div class="top">
 <header><h1>Field Twin Violet</h1><span id="status"></span></header>
-<main id="app"><p class="muted">Loading</p></main>
 <nav id="nav" hidden>
   <button data-tab="stock">Stock</button>
   <button data-tab="log">Log</button>
@@ -88,6 +90,8 @@
   <button data-tab="failures">Failures</button>
   <button data-tab="more">More</button>
 </nav>
+</div>
+<main id="app"><p class="muted">Loading</p></main>
 <div id="modal"><div class="sheet" id="sheet"></div></div>
 <div id="toast"></div>
 <script>
@@ -108,9 +112,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 </script>
 <script>
 // Field Twin Violet v1
-// RED PHONE: phone app for field-twin-violet-api. Built by Claude Code in the cloud session for Red Phone.
-// RED PHONE: offline first. Every save goes into an IndexedDB queue on the phone and syncs to Supabase when signal returns.
-// RED PHONE: counts are never typed in. Who holds what is worked out from the append only event log.
+// BLUE PHONE: phone app for field-twin-violet-api. Built by Claude Code in the cloud session for Blue Phone.
+// BLUE PHONE: offline first. Every save goes into an IndexedDB queue on the phone and syncs to Supabase when signal returns.
+// BLUE PHONE: counts are never typed in. Who holds what is worked out from the append only event log.
 (() => {
   "use strict";
 

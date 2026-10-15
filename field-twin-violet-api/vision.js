@@ -1,5 +1,5 @@
 // Field Twin Violet API v1
-// RED PHONE: reads manifests, box labels, part labels, serial plates, and parts with the Anthropic API.
+// BLUE PHONE: reads manifests, box labels, part labels, serial plates, and parts with the Anthropic API.
 import Anthropic from "@anthropic-ai/sdk";
 
 const MODEL = process.env.VISION_MODEL || "claude-sonnet-5-5";

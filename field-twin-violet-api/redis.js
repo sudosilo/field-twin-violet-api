@@ -1,5 +1,5 @@
 // Field Twin Violet API v1
-// RED PHONE: Redis connection, optional so the service still boots without it.
+// BLUE PHONE: Redis connection, optional so the service still boots without it.
 import Redis from "ioredis";
 
 export const redis = process.env.REDIS_URL
