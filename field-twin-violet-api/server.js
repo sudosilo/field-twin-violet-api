@@ -1,4 +1,4 @@
-// Field Twin Violet API v1
+// Field Twin Violet API v2
 // BLUE PHONE: photo reader and archive relay for Field Twin Violet. Holds the Anthropic key so the phone never does.
 // Endpoints: GET /, GET /health, POST /extract, POST /archive
 import express from "express";
@@ -30,17 +30,44 @@ const API_TOKEN = process.env.API_TOKEN || "";
 const EXTRACTS_PER_HOUR = Number(process.env.EXTRACTS_PER_HOUR) || 150;
 const CACHE_DAYS = 30;
 
-function tokenOk(req) {
+// BLUE PHONE: a signed in Field Twin Violet user is let in by their Supabase session, so the phone needs no pasted token.
+const SUPABASE_URL = process.env.SUPABASE_URL || "https://zasyjjoypkpvyqdueums.supabase.co";
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || "sb_publishable_iFsIWHo1XN6bO6S5z5vJEg_k6IRq94z";
+const sessionCache = new Map();
+
+function staticTokenOk(given) {
   if (!API_TOKEN) return false;
-  const given = String(req.get("Authorization") || "").replace(/^Bearer\s+/i, "");
   const a = crypto.createHash("sha256").update(given).digest();
   const b = crypto.createHash("sha256").update(API_TOKEN).digest();
   return crypto.timingSafeEqual(a, b);
 }
 
+async function sessionOk(given) {
+  if (!given || given.split(".").length !== 3) return false;
+  const key = crypto.createHash("sha256").update(given).digest("hex");
+  const hit = sessionCache.get(key);
+  if (hit && hit.until > Date.now()) return hit.ok;
+  let ok = false;
+  try {
+    const r = await fetch(SUPABASE_URL + "/auth/v1/user", { headers: { apikey: SUPABASE_ANON_KEY, Authorization: "Bearer " + given } });
+    ok = r.ok;
+  } catch {
+    ok = false;
+  }
+  if (sessionCache.size > 500) sessionCache.clear();
+  sessionCache.set(key, { ok, until: Date.now() + (ok ? 300000 : 30000) });
+  return ok;
+}
+
+async function tokenOk(req) {
+  const given = String(req.get("Authorization") || "").replace(/^Bearer\s+/i, "");
+  return staticTokenOk(given) || (await sessionOk(given));
+}
+
 function requireToken(req, res, next) {
-  if (!tokenOk(req)) return res.status(401).json({ error: "token rejected" });
-  next();
+  tokenOk(req)
+    .then((ok) => (ok ? next() : res.status(401).json({ error: "token rejected" })))
+    .catch(next);
 }
 
 function parseImage(dataUrl) {
@@ -52,7 +79,7 @@ function parseImage(dataUrl) {
 const wrap = (handler) => (req, res, next) => handler(req, res).catch(next);
 
 app.get("/", (req, res) => {
-  res.json({ name: "field-twin-violet-api", version: "1.0.0", endpoints: ["/health", "/extract", "/archive"] });
+  res.json({ name: "field-twin-violet-api", version: "2.0.0", endpoints: ["/health", "/extract", "/archive"] });
 });
 
 app.get(
@@ -67,7 +94,7 @@ app.get(
       }
     }
     res.json({
-      ok: visionReady() && Boolean(API_TOKEN),
+      ok: visionReady(),
       keyConfigured: visionReady(),
       tokenConfigured: Boolean(API_TOKEN),
       redis: redisState,

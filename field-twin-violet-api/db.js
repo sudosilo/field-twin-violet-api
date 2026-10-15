@@ -63,12 +63,17 @@ export const STATEMENTS = [
   `ALTER TABLE public.violet_catalog ADD COLUMN IF NOT EXISTS vendor TEXT NOT NULL DEFAULT ''`,
   `ALTER TABLE public.violet_catalog ADD COLUMN IF NOT EXISTS min_qty NUMERIC NOT NULL DEFAULT 0`,
   `ALTER TABLE public.violet_events ADD COLUMN IF NOT EXISTS vendor TEXT NOT NULL DEFAULT ''`,
-  `INSERT INTO storage.buckets (id, name, public) VALUES ('violet-photos', 'violet-photos', false)
-     ON CONFLICT (id) DO NOTHING`,
-  `DROP POLICY IF EXISTS "violet photos owner" ON storage.objects`,
-  `CREATE POLICY "violet photos owner" ON storage.objects FOR ALL TO authenticated
-     USING (bucket_id = 'violet-photos' AND (storage.foldername(name))[1] = auth.uid()::text)
-     WITH CHECK (bucket_id = 'violet-photos' AND (storage.foldername(name))[1] = auth.uid()::text)`,
+  `DO $$ BEGIN
+     INSERT INTO storage.buckets (id, name, public) VALUES ('violet-photos', 'violet-photos', false) ON CONFLICT (id) DO NOTHING;
+   EXCEPTION WHEN others THEN RAISE NOTICE 'violet photo bucket skipped: %', SQLERRM;
+   END $$`,
+  `DO $$ BEGIN
+     DROP POLICY IF EXISTS "violet photos owner" ON storage.objects;
+     CREATE POLICY "violet photos owner" ON storage.objects FOR ALL TO authenticated
+       USING (bucket_id = 'violet-photos' AND (storage.foldername(name))[1] = auth.uid()::text)
+       WITH CHECK (bucket_id = 'violet-photos' AND (storage.foldername(name))[1] = auth.uid()::text);
+   EXCEPTION WHEN others THEN RAISE NOTICE 'violet photo policy skipped: %', SQLERRM;
+   END $$`,
 ];
 
 export async function setupDatabase() {

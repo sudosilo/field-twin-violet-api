@@ -67,11 +67,15 @@ DROP POLICY IF EXISTS "violet_events owner" ON public.violet_events;
 CREATE POLICY "violet_events owner" ON public.violet_events FOR ALL TO authenticated
        USING (owner = auth.uid()) WITH CHECK (owner = auth.uid());
 
-INSERT INTO storage.buckets (id, name, public) VALUES ('violet-photos', 'violet-photos', false)
-     ON CONFLICT (id) DO NOTHING;
+DO $$ BEGIN
+  INSERT INTO storage.buckets (id, name, public) VALUES ('violet-photos', 'violet-photos', false) ON CONFLICT (id) DO NOTHING;
+EXCEPTION WHEN others THEN RAISE NOTICE 'violet photo bucket skipped: %', SQLERRM;
+END $$;
 
-DROP POLICY IF EXISTS "violet photos owner" ON storage.objects;
-
-CREATE POLICY "violet photos owner" ON storage.objects FOR ALL TO authenticated
-     USING (bucket_id = 'violet-photos' AND (storage.foldername(name))[1] = auth.uid()::text)
-     WITH CHECK (bucket_id = 'violet-photos' AND (storage.foldername(name))[1] = auth.uid()::text);
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "violet photos owner" ON storage.objects;
+  CREATE POLICY "violet photos owner" ON storage.objects FOR ALL TO authenticated
+    USING (bucket_id = 'violet-photos' AND (storage.foldername(name))[1] = auth.uid()::text)
+    WITH CHECK (bucket_id = 'violet-photos' AND (storage.foldername(name))[1] = auth.uid()::text);
+EXCEPTION WHEN others THEN RAISE NOTICE 'violet photo policy skipped: %', SQLERRM;
+END $$;
