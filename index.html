@@ -156,8 +156,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     written_off: { label: "Used up or tossed", verb: "Used up or tossed", desc: "Consumables used up, or junk thrown away" },
   };
   const TYPES = Object.fromEntries(Object.entries(ACTIONS).map(([k, v]) => [k, v.verb]));
-  const LOC_KINDS = { tech: "On me", truck: "Truck", home: "Home shelf", return: "Return box", other: "Other" };
-  const QUICK_LOCS = [["My truck", "truck"], ["Home shelf", "home"], ["On me", "tech"], ["Return box", "return"]];
+  const LOC_KINDS = { tech: "On me", truck: "Truck", home: "Home", storage: "Storage unit", return: "Return box", other: "Other" };
+  const QUICK_LOCS = [["My truck", "truck"], ["Home shelf", "home"], ["Storage unit", "storage"], ["On me", "tech"], ["Return box", "return"]];
   const ITEM_KINDS = { part: "Part", tool: "Tool", consumable: "Consumable" };
   const CONDITIONS = { good: "Good", damaged: "Damaged", failed: "Failed" };
   const SYMPTOMS = [
@@ -704,7 +704,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       <div class="tiles"><div class="tile"><span class="muted">On hand</span><b>${fmtNum(have)}</b>${esc(c.unit || "each")}</div>
         <div class="tile"><span class="muted">Installed</span><b>${installed.length}</b>at lockers</div></div>
       <h3>Where it is</h3>
-      <div class="card list">${[...where].filter(([, n]) => Math.abs(n) > 1e-9).map(([h, n]) => `<div class="tap" data-loc="${h}">${esc(holderName(h))} <span class="muted">${fmtNum(n)} ${esc(c.unit || "each")}</span></div>`).join("") || '<div class="muted">Not in any location right now</div>'}</div>
+      <div class="card list">${[...where].filter(([, n]) => Math.abs(n) > 1e-9).map(([h, n]) => `<div class="row" style="align-items:center"><div class="tap" data-loc="${h}"><b>${esc(holderName(h))}</b> <span class="muted">${fmtNum(n)} ${esc(c.unit || "each")}</span></div><button class="btn small primary" style="flex:0 0 auto" data-start="moved" data-for="${c.id}" data-from="${h}">Move</button></div>`).join("") || '<div class="muted">Not in any location right now</div>'}</div>
       ${serialsHere.length ? `<h3>Serials on hand</h3><div class="card list">${serialsHere.map((it) => `<div class="tap" data-serial="${esc(it.serial)}">SN ${esc(it.serial)} <span class="muted">${esc(holderName(it.holder))} · since ${esc(fmtDate(it.last.happened_at))}</span></div>`).join("")}</div>` : ""}
       ${installed.length ? `<h3>Installed at lockers</h3><div class="card list">${installed.map((s) => `<div class="tap" data-serial="${esc(s.serial)}">SN ${esc(s.serial)} <span class="muted">locker ${esc(s.locker_id)} · ${esc(s.site)}</span></div>`).join("")}</div>` : ""}
       <h3>Details</h3>
@@ -814,7 +814,23 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 
   function holderOptions(sel, filterKinds) {
     const hs = holders().filter((h) => !filterKinds || filterKinds.includes(h.kind));
-    return `<option value="">Choose</option>` + hs.map((h) => `<option value="${h.id}" ${sel === h.id ? "selected" : ""}>${esc(h.name)} (${esc(LOC_KINDS[h.kind] || h.kind)})</option>`).join("");
+    return `<option value="">Choose</option>` + hs.map((h) => `<option value="${h.id}" ${sel === h.id ? "selected" : ""}>${esc(h.name)} (${esc(LOC_KINDS[h.kind] || h.kind)})</option>`).join("") + `<option value="@new">Add a new location</option>`;
+  }
+
+  function guessKind(name) {
+    const n = name.toLowerCase();
+    if (n.includes("storage")) return "storage";
+    if (n.includes("truck") || n.includes("van") || n.includes("car")) return "truck";
+    if (n.includes("home") || n.includes("house") || n.includes("garage") || n.includes("shed")) return "home";
+    if (n.includes("return")) return "return";
+    return "other";
+  }
+
+  async function addLocation(name, kind) {
+    const row = { id: uuid(), owner: uid(), name, kind: kind || guessKind(name), created_at: nowIso() };
+    await enqueue("violet_holders", row);
+    sync();
+    return row;
   }
 
   function renderPicker() {
@@ -923,12 +939,22 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     return S.settings.token || S.accessToken || "";
   }
 
-  function startLog(type, catalogId) {
+  function startLog(type, catalogId, fromHolder) {
     S.log = newLog(type);
     if (catalogId) {
       const c = catalogById(catalogId);
       if (c) {
-        S.log.items.push(itemFromCatalog(c));
+        const it = itemFromCatalog(c);
+        if (fromHolder) {
+          // Moving out of one location: fill in how many sit there, or the serial when there is only one.
+          const here = (derive().byCatalog.get(c.id) || []).filter((x) => x.holder === fromHolder);
+          const serialsHere = here.filter((x) => x.kind === "serial");
+          const qtyHere = here.filter((x) => x.kind === "qty").reduce((a, x) => a + x.qty, 0);
+          if (serialsHere.length === 1 && qtyHere <= 0) it.serial = serialsHere[0].serial;
+          else if (qtyHere > 0) it.quantity = qtyHere;
+          S.log.f.from_holder = fromHolder;
+        }
+        S.log.items.push(it);
         if (type === "received" && c.vendor) S.log.f.vendor = c.vendor;
       }
     }
@@ -1378,13 +1404,12 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     }
     if (t.dataset.start) {
       closeModal();
-      return startLog(t.dataset.start, t.dataset.for || "");
+      return startLog(t.dataset.start, t.dataset.for || "", t.dataset.from || "");
     }
     if (t.dataset.quickloc) {
-      await enqueue("violet_holders", { id: uuid(), owner: uid(), name: t.dataset.quickloc, kind: t.dataset.kind, created_at: nowIso() });
+      await addLocation(t.dataset.quickloc, t.dataset.kind);
       toast(t.dataset.quickloc + " added");
-      render();
-      return sync();
+      return render();
     }
     if (t.dataset.loc) {
       closeModal();
@@ -1530,7 +1555,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       return rerenderKeepingFocus("pickSearch");
     }
     if (!S.log) return;
-    if (t.dataset.f) S.log.f[t.dataset.f] = t.value;
+    if (t.dataset.f && t.value !== "@new") S.log.f[t.dataset.f] = t.value;
     if (t.dataset.item !== undefined && t.dataset.k) {
       const it = S.log.items[Number(t.dataset.item)];
       if (t.dataset.k === "include") it.include = t.checked;
@@ -1542,8 +1567,19 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     }
   });
 
-  document.addEventListener("change", (ev) => {
+  document.addEventListener("change", async (ev) => {
     const t = ev.target;
+    if (S.log && t.dataset.f && t.value === "@new") {
+      const name = (window.prompt("Name of the new location, for example Storage unit or Second truck") || "").trim();
+      if (!name) {
+        t.value = S.log.f[t.dataset.f] || "";
+        return;
+      }
+      const row = await addLocation(name.slice(0, 80));
+      S.log.f[t.dataset.f] = row.id;
+      toast(name + " added");
+      return render();
+    }
     if (t.id === "photoInput" && t.files && t.files[0]) return handlePhoto(t.files[0]);
     if (t.id === "itemPhotoInput" && t.files && t.files[0]) return setItemPhoto(t.dataset.cat, t.files[0]);
     if (t.id === "vendorFilter") {
