@@ -413,13 +413,20 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     try {
       const ops = (await idb.queueAll()).filter((op) => op.owner === S.user.id);
       let photoError = "";
+      let waitingTable = "";
       for (const op of ops) {
         // Rows go up first so one stuck photo never holds back the records behind it.
         if (op.table) {
           const row = { ...op.row };
+          let skip = false;
           for (let tries = 0; ; tries++) {
             const { error } = await sb.from(op.table).upsert(row);
             if (!error) break;
+            if (op.table === "violet_orders" && /could not find the table|does not exist|schema cache/i.test(error.message || "")) {
+              waitingTable = "Orders are saved on this phone and upload once the server update finishes.";
+              skip = true;
+              break;
+            }
             const missing = /Could not find the '([^']+)' column/.exec(error.message || "");
             if (missing && tries < 6 && missing[1] in row) {
               delete row[missing[1]];
@@ -427,6 +434,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
             }
             throw new Error(error.message);
           }
+          if (skip) continue;
         }
         const stuck = [];
         for (const p of op.photos || []) {
@@ -440,6 +448,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         if (stuck.length) await idb.queuePut({ qid: op.qid, owner: op.owner, table: null, row: null, photos: stuck });
       }
       await pull();
+      if (waitingTable) S.syncError = waitingTable;
       if (photoError) S.syncError = photoError + ". Your records are saved; the photos stay on this phone and upload on the next try.";
     } catch (err) {
       S.syncError = err.message || String(err);
