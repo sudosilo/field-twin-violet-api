@@ -114,9 +114,10 @@ app.post(
     const img = parseImage(req.body && req.body.image);
     if (!img) return res.status(400).json({ error: "image must be a base64 data URL" });
     const barcodes = Array.isArray(req.body.barcodes) ? req.body.barcodes : [];
+    const purpose = req.body.purpose === "order" ? "order" : "";
 
     // BLUE PHONE: same photo and barcodes never get analyzed or billed twice.
-    const hash = crypto.createHash("sha256").update(img.base64).update(JSON.stringify(barcodes)).digest("hex");
+    const hash = crypto.createHash("sha256").update(img.base64).update(JSON.stringify(barcodes)).update(purpose).digest("hex");
     const cacheKey = `violet:extract:${hash}`;
     if (redis) {
       const hit = await redis.get(cacheKey).catch(() => null);
@@ -127,7 +128,7 @@ app.post(
       if (calls > EXTRACTS_PER_HOUR) return res.status(429).json({ error: "hourly photo limit reached, try again later" });
     }
 
-    const result = await extractFromImage({ ...img, barcodes });
+    const result = await extractFromImage({ ...img, barcodes, purpose });
     if (redis) await redis.set(cacheKey, JSON.stringify(result), "EX", CACHE_DAYS * 86400).catch(() => {});
     res.json({ result, cached: false });
   })

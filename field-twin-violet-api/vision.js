@@ -25,6 +25,18 @@ const SYSTEM = [
   "confidence values are numbers from 0 to 1. quantity is a number. Use empty strings for anything missing.",
 ].join("\n");
 
+const ORDER_SYSTEM = [
+  "You read photos and screenshots of purchase orders: online order confirmations, order history pages, order emails, carts after checkout, and paper or web order forms from any store or supplier.",
+  "Pull out who the order was placed with, the order number, the order date, and every item ordered with its quantity.",
+  "Copy order numbers and part numbers exactly as shown. Never guess a number you cannot fully read: leave it empty and give it a confidence of 0.",
+  "Reply with only one JSON object, no markdown fences, no commentary, in exactly this shape:",
+  '{"source":"order","shipment":{"vendor":"","tracking":"","po":"","order":"","date":""},"items":[{"name":"","kind":"part|tool|consumable","part_number":"","serial":"","manufacturer":"","model":"","quantity":1,"unit":"each","other_ids":[],"confidence":{"name":0,"part_number":0,"serial":0,"quantity":0}}],"notes":""}',
+  "vendor: the store or supplier the order was placed with. order: the order number. po: a purchase order number if one is shown. date: the order date as YYYY-MM-DD.",
+  "items: one entry per ordered line with its quantity. name: a short plain description of the product. part_number: a model, part, or item number if shown.",
+  "kind: tool for reusable tools, consumable for anything used up such as memory cards, batteries, tape, fasteners, cleaners, part for components that get installed.",
+  "Leave serial empty. Prices are not needed. If nothing ordered can be identified, return an empty items array and say why in notes.",
+].join("\n");
+
 function str(v, max = 200) {
   return v === null || v === undefined ? "" : String(v).trim().slice(0, max);
 }
@@ -34,7 +46,7 @@ function num01(v) {
 }
 
 function normalize(raw) {
-  const src = ["manifest", "box", "label", "part", "other"].includes(raw.source) ? raw.source : "other";
+  const src = ["manifest", "box", "label", "part", "order", "other"].includes(raw.source) ? raw.source : "other";
   const ship = raw.shipment && typeof raw.shipment === "object" ? raw.shipment : {};
   const items = Array.isArray(raw.items) ? raw.items.slice(0, 60) : [];
   return {
@@ -74,7 +86,7 @@ function normalize(raw) {
   };
 }
 
-export async function extractFromImage({ mediaType, base64, barcodes }) {
+export async function extractFromImage({ mediaType, base64, barcodes, purpose }) {
   const codes = (barcodes || []).map((b) => str(b, 200)).filter(Boolean).slice(0, 10);
   const text = codes.length
     ? "Barcode values decoded on the phone: " + codes.join(" | ")
@@ -83,7 +95,7 @@ export async function extractFromImage({ mediaType, base64, barcodes }) {
     {
       model: MODEL,
       max_tokens: 4000,
-      system: SYSTEM,
+      system: purpose === "order" ? ORDER_SYSTEM : SYSTEM,
       messages: [
         {
           role: "user",

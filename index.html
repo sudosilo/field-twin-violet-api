@@ -96,7 +96,7 @@
   .back { margin: 4px 0 2px; }
   .maplink { font-size: 13px; font-weight: 700; color: var(--accent); text-decoration: none; border: 1px solid var(--accent2); border-radius: 99px; padding: 4px 10px; background: #fff; white-space: nowrap; }
   .framed .maplink { display: none; }
-  #vendorFilter { margin-top: 8px; }
+  #vendorFilter, #customerFilter { margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -240,13 +240,15 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     user: null,
     demo: false,
     demoData: null,
-    server: { violet_holders: [], violet_catalog: [], violet_events: [] },
+    server: { violet_holders: [], violet_catalog: [], violet_events: [], violet_orders: [] },
     queue: [],
     tab: "home",
     itemId: "",
     itemLoc: "",
     itemKind: "",
     itemVendor: "",
+    itemCustomer: "",
+    orderForm: null,
     itemSearch: "",
     historySearch: "",
     historyLimit: 100,
@@ -265,7 +267,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   }
 
   function rows(table) {
-    if (S.demo) return S.demoData[table];
+    if (S.demo) return S.demoData[table] || (S.demoData[table] = []);
     const byId = new Map(S.server[table].map((r) => [r.id, r]));
     for (const op of S.queue) if (op.table === table && op.row) byId.set(op.row.id, { ...op.row, _pending: true });
     return [...byId.values()];
@@ -273,6 +275,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   const holders = () => rows("violet_holders").slice().sort((a, b) => a.name.localeCompare(b.name));
   const catalog = () => rows("violet_catalog");
   const events = () => rows("violet_events");
+  const orders = () => rows("violet_orders");
   const holderById = (id) => rows("violet_holders").find((x) => x.id === id);
   const holderName = (id) => {
     const h = holderById(id);
@@ -280,6 +283,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   };
   const catalogById = (id) => rows("violet_catalog").find((c) => c.id === id);
   const partLabel = (c) => (c ? [c.name, c.part_number].filter(Boolean).join(" · ") || "Unnamed item" : "Unknown item");
+  const customers = () => [...new Set([...catalog().map((c) => c.customer), ...events().map((e) => e.customer)].map((v) => String(v || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const vendors = () => [...new Set([...catalog().map((c) => c.vendor), ...events().map((e) => e.vendor)].map((v) => String(v || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const clean = (row) => {
     const { _pending, ...rest } = row;
@@ -388,7 +392,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   async function pull() {
     if (S.demo || !S.user || !navigator.onLine) return;
     const [h, c, e] = await Promise.all(["violet_holders", "violet_catalog", "violet_events"].map(fetchAll));
-    S.server = { violet_holders: h, violet_catalog: c, violet_events: e };
+    const o = await fetchAll("violet_orders").catch(() => S.server.violet_orders || []);
+    S.server = { violet_holders: h, violet_catalog: c, violet_events: e, violet_orders: o };
     S.lastSync = nowIso();
     await idb.set("data:" + S.user.id, { server: S.server, lastSync: S.lastSync });
   }
@@ -447,7 +452,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
 
   async function enqueue(table, row, photos = []) {
     if (S.demo) {
-      const list = S.demoData[table];
+      const list = S.demoData[table] || (S.demoData[table] = []);
       const i = list.findIndex((r) => r.id === row.id);
       if (i >= 0) list[i] = row;
       else list.push(row);
@@ -639,8 +644,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     let list = catalog().slice();
     if (S.itemKind) list = list.filter((c) => c.kind === S.itemKind);
     if (S.itemVendor) list = list.filter((c) => (c.vendor || "") === S.itemVendor);
+    if (S.itemCustomer) list = list.filter((c) => (c.customer || "") === S.itemCustomer);
     if (S.itemLoc) list = list.filter((c) => (d.byCatalog.get(c.id) || []).some((it) => it.holder === S.itemLoc));
-    if (q) list = list.filter((c) => [c.name, c.part_number, c.model, c.manufacturer, c.vendor].some((v) => norm(v).includes(q)) || [...d.serials.values()].some((s) => s.catalog_id === c.id && norm(s.serial).includes(q)));
+    if (q) list = list.filter((c) => [c.name, c.part_number, c.model, c.manufacturer, c.vendor, c.customer].some((v) => norm(v).includes(q)) || [...d.serials.values()].some((s) => s.catalog_id === c.id && norm(s.serial).includes(q)));
     list.sort((a, b) => partLabel(a).localeCompare(partLabel(b)));
     const kindChips = [["", "All"], ...Object.entries(ITEM_KINDS).map(([k, v]) => [k, v + "s"])]
       .map(([k, v]) => `<button class="btn small ${S.itemKind === k ? "on" : ""}" data-itemkind="${k}">${esc(v)}</button>`)
@@ -648,6 +654,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const vs = vendors();
     const vendorSel = vs.length
       ? `<select id="vendorFilter"><option value="">Every vendor</option>${vs.map((v) => `<option ${S.itemVendor === v ? "selected" : ""}>${esc(v)}</option>`).join("")}</select>`
+      : "";
+    const cs = customers();
+    const customerSel = cs.length
+      ? `<select id="customerFilter"><option value="">Every customer</option>${cs.map((v) => `<option ${S.itemCustomer === v ? "selected" : ""}>${esc(v)}</option>`).join("")}</select>`
       : "";
     const locChip = S.itemLoc ? `<div class="chips"><span class="pill on">In ${esc(holderName(S.itemLoc))}</span><button class="btn small" data-act="clear-loc">Show all items</button></div>` : "";
     const rowsHtml = list
@@ -660,14 +670,15 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           <div class="thumbcell">${photo}</div>
           <div><b>${esc(partLabel(c))}</b>${low ? ' <span class="pill low">Low</span>' : ""}${c._pending ? ' <span class="pill">not uploaded yet</span>' : ""}<br>
           <span class="muted">${fmtNum(have)} ${esc(c.unit || "each")} on hand${where ? " · " + esc(where) : ""}</span><br>
-          <span class="muted">${esc(ITEM_KINDS[c.kind] || c.kind)}${c.vendor ? " · " + esc(c.vendor) : ""}</span></div>
+          <span class="muted">${esc(ITEM_KINDS[c.kind] || c.kind)}${c.vendor ? " · " + esc(c.vendor) : ""}${c.customer ? " · for " + esc(c.customer) : ""}</span></div>
         </div>`;
       })
       .join("");
     return `${locChip}
       <div class="chips">${kindChips}</div>
       ${vendorSel}
-      <label>Search name, part number, serial, maker, or vendor</label><input id="itemSearch" value="${esc(S.itemSearch)}" placeholder="Search">
+      ${customerSel}
+      <label>Search name, part number, serial, maker, vendor, or customer</label><input id="itemSearch" value="${esc(S.itemSearch)}" placeholder="Search">
       <div class="card list">${rowsHtml || '<div class="muted">No items match. Items show up here the first time you add them.</div>'}</div>
       <button class="btn primary wide" data-start="received">Add stuff</button>`;
   }
@@ -689,7 +700,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const firstEvent = evs.length ? evs[evs.length - 1] : null;
     const details = [
       ["Kind", ITEM_KINDS[c.kind] || c.kind], ["Part number", c.part_number], ["Maker", c.manufacturer], ["Model", c.model],
-      ["Vendor", c.vendor], ["Unit", c.unit], ["Reorder when below", Number(c.min_qty) > 0 ? fmtNum(Number(c.min_qty)) : ""],
+      ["Vendor", c.vendor], ["Customer", c.customer], ["Unit", c.unit], ["Reorder when below", Number(c.min_qty) > 0 ? fmtNum(Number(c.min_qty)) : ""],
       ["Added to the system", fmtDate(c.created_at)], ["First logged", firstEvent ? fmtDate(firstEvent.happened_at) : ""],
     ].filter(([, v]) => v);
     const startBtns = Object.entries(ACTIONS)
@@ -709,7 +720,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       ${installed.length ? `<h3>Installed at lockers</h3><div class="card list">${installed.map((s) => `<div class="tap" data-serial="${esc(s.serial)}">SN ${esc(s.serial)} <span class="muted">locker ${esc(s.locker_id)} · ${esc(s.site)}</span></div>`).join("")}</div>` : ""}
       <h3>Details</h3>
       <div class="card"><table>${details.map(([k, v]) => `<tr><td class="muted">${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}</table>
-        <button class="btn wide" data-act="edit-item" data-cat="${c.id}">Edit details, vendor, and reorder level</button></div>
+        <button class="btn wide" data-act="edit-item" data-cat="${c.id}">Edit details, vendor, customer, and reorder level</button></div>
       <h3>Log something for this item</h3>
       <div class="chips">${startBtns}</div>
       ${photos.length ? `<h3>Other photos</h3><p class="muted">Tap one to make it the main photo.</p><div class="photos">${photos.map((p) => `<img class="thumb tap" data-photo="${esc(p)}" data-setref="${esc(p)}" data-cat="${c.id}" alt="">`).join("")}</div>` : ""}
@@ -729,6 +740,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         <div class="row"><div><label>Maker</label><input name="manufacturer" value="${esc(c.manufacturer)}" maxlength="120"></div><div><label>Model</label><input name="model" value="${esc(c.model)}" maxlength="120"></div></div>
         <label>Vendor (who you buy it from)</label><input name="vendor" list="vendorList" value="${esc(c.vendor || "")}" maxlength="120">
         <datalist id="vendorList">${vs.map((v) => `<option value="${esc(v)}">`).join("")}</datalist>
+        <label>Customer (who it is for)</label><input name="customer" list="customerList" value="${esc(c.customer || "")}" maxlength="120">
+        <datalist id="customerList">${customers().map((v) => `<option value="${esc(v)}">`).join("")}</datalist>
         <div class="row"><div><label>Unit</label><input name="unit" value="${esc(c.unit || "each")}" maxlength="30"></div>
           <div><label>Reorder when below</label><input name="min_qty" type="number" min="0" step="any" value="${Number(c.min_qty) > 0 ? esc(c.min_qty) : ""}" placeholder="No reorder"></div></div>
         <p class="muted">Set a reorder level and this item lands on the Order list whenever you have less than that on hand.</p>
@@ -737,25 +750,213 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   }
 
   // ----- Order -----
+  function orderLineLeft(l) {
+    return Math.max(0, (Number(l.qty) || 0) - (Number(l.received) || 0));
+  }
+  function orderSummary(o) {
+    const lines = o.lines || [];
+    const done = lines.filter((l) => orderLineLeft(l) <= 0).length;
+    return `${lines.length} line${lines.length === 1 ? "" : "s"}${done ? `, ${done} arrived` : ""}`;
+  }
+  function orderCard(o, open) {
+    const head = [o.vendor || "No vendor", o.order_number ? "order " + o.order_number : "", o.ordered_at ? fmtDay(o.ordered_at) : ""].filter(Boolean).join(" · ");
+    const lines = (o.lines || []).map((l) => `<div class="muted">${esc(l.name || l.part_number || "Unnamed")} · ${fmtNum(Number(l.qty) || 0)}${Number(l.received) ? ` · ${fmtNum(Number(l.received))} arrived` : ""}</div>`).join("");
+    return `<div class="card"><b>${esc(head)}</b>${o._pending ? ' <span class="pill">not uploaded yet</span>' : ""}${o.customer ? `<div class="muted">For ${esc(o.customer)}</div>` : ""}
+      <div style="margin:6px 0">${lines || '<div class="muted">No items listed</div>'}</div>${o.note ? `<div class="muted">${esc(o.note)}</div>` : ""}
+      ${(o.photos || []).length ? photoStrip(o.photos) : ""}
+      ${open ? `<div class="row"><button class="btn small primary" data-act="order-arrive" data-order="${o.id}">It arrived, add to stock</button><button class="btn small" data-act="order-edit" data-order="${o.id}">Edit</button><button class="btn small" data-act="order-close" data-order="${o.id}">Cancel order</button></div>` : `<div class="muted">${o.status === "cancelled" ? "Cancelled" : "Arrived"}</div>`}</div>`;
+  }
+
+  function renderOrderForm() {
+    const O = S.orderForm;
+    const vs = vendors();
+    const cs = customers();
+    const lineRows = O.lines.map((l, i) => `<div class="card">
+        <label>Item</label><input data-ol="${i}" data-ok="name" value="${esc(l.name)}">
+        <div class="row"><div><label>Part number</label><input data-ol="${i}" data-ok="part_number" value="${esc(l.part_number)}"></div>
+          <div><label>How many</label><input data-ol="${i}" data-ok="qty" type="number" min="0" step="any" value="${esc(l.qty)}"></div></div>
+        <label>Kind</label><select data-ol="${i}" data-ok="kind">${Object.entries(ITEM_KINDS).map(([k, v]) => `<option value="${k}" ${l.kind === k ? "selected" : ""}>${v}</option>`).join("")}</select>
+        <button class="btn small" data-act="order-line-del" data-line="${i}">Remove this line</button></div>`).join("");
+    return `<button class="btn small back" data-act="order-back">Cancel</button>
+      <h2>${O.id ? "Edit order" : "Add an order"}</h2>
+      <div class="card">
+        <label class="btn primary wide" style="text-align:center">Photo of the order<input id="orderPhotoInput" type="file" accept="image/*" capture="environment" hidden></label>
+        <p class="muted">A screenshot or photo of an order confirmation, an online order page, or an order form fills this in for you. Check every line before saving.</p>
+        ${O.photo ? `<img class="preview" src="${O.photo.url}" alt="">` : ""}
+        ${O.status ? `<p class="muted">${esc(O.status)}</p>` : ""}
+        ${O.error ? `<p class="err">${esc(O.error)}</p>` : ""}
+      </div>
+      <div class="card">
+        <label>Vendor (who you ordered from)</label><input data-of="vendor" list="vendorList" value="${esc(O.f.vendor)}"><datalist id="vendorList">${vs.map((v) => `<option value="${esc(v)}">`).join("")}</datalist>
+        <label>Customer (who it is for, optional)</label><input data-of="customer" list="customerList" value="${esc(O.f.customer)}"><datalist id="customerList">${cs.map((v) => `<option value="${esc(v)}">`).join("")}</datalist>
+        <div class="row"><div><label>Order number</label><input data-of="order_number" value="${esc(O.f.order_number)}"></div>
+          <div><label>Ordered on</label><input data-of="ordered_at" type="date" value="${esc(O.f.ordered_at)}"></div></div>
+        <label>Note</label><input data-of="note" value="${esc(O.f.note)}">
+      </div>
+      <h3>What you ordered</h3>
+      ${lineRows}
+      <button class="btn wide" data-act="order-line-add">Add a line</button>
+      <button class="btn primary wide" data-act="order-save" ${O.busy ? "disabled" : ""}>Save order</button>`;
+  }
+
   function renderOrder() {
+    if (S.orderForm) return renderOrderForm();
     const d = derive();
     const list = orderList(d);
+    const all = orders().slice().sort((a, b) => String(b.ordered_at || b.created_at).localeCompare(String(a.ordered_at || a.created_at)));
+    const open = all.filter((o) => o.status === "open");
+    const closed = all.filter((o) => o.status !== "open").slice(0, 10);
+    const top = `<button class="btn primary wide" data-act="order-new">Add an order</button>
+      <h2>Waiting to arrive</h2>
+      ${open.map((o) => orderCard(o, true)).join("") || '<div class="card"><p class="muted">No open orders. Add one when you order something, and it waits here until it arrives.</p></div>'}`;
     const withMin = catalog().filter((c) => Number(c.min_qty) > 0).length;
-    if (!list.length)
-      return `<div class="card"><h2>Nothing to order</h2><p>${withMin ? "Everything with a reorder level is stocked above it." : "Open any item under Items, tap Edit details, and set Reorder when below. When you have less than that on hand, the item shows up here, grouped by vendor."}</p></div>`;
-    const groups = new Map();
-    for (const x of list) {
-      const v = (x.c.vendor || "").trim() || "No vendor set";
-      if (!groups.has(v)) groups.set(v, []);
-      groups.get(v).push(x);
-    }
-    const html = [...groups]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([v, xs]) => `<h2>${esc(v)}</h2><div class="card list">${xs.map((x) => `<div class="tap" data-catalog="${x.c.id}"><b>${esc(partLabel(x.c))}</b><br><span class="muted">Order ${fmtNum(x.need)} ${esc(x.c.unit || "each")} · have ${fmtNum(x.have)} · reorder below ${fmtNum(x.min)}</span></div>`).join("")}</div>`)
-      .join("");
-    return `<p class="muted">Items below their reorder level, grouped by vendor.</p>
-      <div class="row"><button class="btn primary" data-act="copy-order">Copy order list</button>${navigator.share ? '<button class="btn" data-act="share-order">Share</button>' : ""}</div>
+    let low;
+    if (!list.length) {
+      low = `<h2>Running low</h2><div class="card"><p>${withMin ? "Everything with a reorder level is stocked above it." : "Open any item under Items, tap Edit details, and set Reorder when below. When you have less than that on hand, the item shows up here, grouped by vendor."}</p></div>`;
+    } else {
+      const groups = new Map();
+      for (const x of list) {
+        const v = (x.c.vendor || "").trim() || "No vendor set";
+        if (!groups.has(v)) groups.set(v, []);
+        groups.get(v).push(x);
+      }
+      const html = [...groups]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([v, xs]) => `<h3>${esc(v)}</h3><div class="card list">${xs.map((x) => `<div class="tap" data-catalog="${x.c.id}"><b>${esc(partLabel(x.c))}</b><br><span class="muted">Order ${fmtNum(x.need)} ${esc(x.c.unit || "each")} · have ${fmtNum(x.have)} · reorder below ${fmtNum(x.min)}</span></div>`).join("")}</div>`)
+        .join("");
+      low = `<h2>Running low</h2><p class="muted">Items below their reorder level, grouped by vendor.</p>
+      <div class="row"><button class="btn" data-act="copy-order">Copy list</button>${navigator.share ? '<button class="btn" data-act="share-order">Share</button>' : ""}</div>
       ${html}`;
+    }
+    const past = closed.length ? `<h2>Arrived and cancelled</h2>${closed.map((o) => orderCard(o, false)).join("")}` : "";
+    return top + low + past;
+  }
+
+  function blankOrderLine() {
+    return { name: "", part_number: "", qty: 1, kind: "part", received: 0 };
+  }
+  function openOrderForm(o) {
+    S.orderForm = {
+      id: o ? o.id : "", photo: null, extracted: null, status: "", error: "", busy: false,
+      f: { vendor: o ? o.vendor || "" : "", customer: o ? o.customer || "" : "", order_number: o ? o.order_number || "" : "", ordered_at: o && o.ordered_at ? String(o.ordered_at).slice(0, 10) : nowIso().slice(0, 10), note: o ? o.note || "" : "" },
+      lines: o ? (o.lines || []).map((l) => ({ ...blankOrderLine(), ...l })) : [blankOrderLine()],
+      photos: o ? o.photos || [] : [],
+    };
+    S.tab = "order";
+    window.scrollTo(0, 0);
+    render();
+  }
+
+  async function handleOrderPhoto(file) {
+    const O = S.orderForm;
+    O.error = "";
+    O.status = "Preparing photo";
+    render();
+    try {
+      const img = await fileToImage(file);
+      const blob = await canvasBlob(drawScaled(img, 1600), 0.85);
+      if (O.photo) URL.revokeObjectURL(O.photo.url);
+      O.photo = { blob, url: URL.createObjectURL(blob) };
+      const token = apiToken();
+      if (!(apiAddress() && token && navigator.onLine)) {
+        O.status = navigator.onLine ? "Sign in to have the order read for you. Fill it in by hand, the photo still saves." : "Offline, so the order was not read. Fill it in by hand, the photo still saves.";
+        return render();
+      }
+      O.status = "Reading the order";
+      render();
+      const dataUrl = drawScaled(img, 1400).toDataURL("image/jpeg", 0.8);
+      const r = await fetch(apiAddress() + "/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+        body: JSON.stringify({ image: dataUrl, barcodes: [], purpose: "order" }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || `order reader answered ${r.status}`);
+      const res = j.result || {};
+      const ship = res.shipment || {};
+      if (ship.vendor && !O.f.vendor) O.f.vendor = ship.vendor;
+      if ((ship.order || ship.po) && !O.f.order_number) O.f.order_number = ship.order || ship.po;
+      const dt = new Date(ship.date);
+      if (ship.date && !isNaN(dt)) O.f.ordered_at = dt.toISOString().slice(0, 10);
+      const read = (res.items || []).map((it) => ({ ...blankOrderLine(), name: it.name || "", part_number: it.part_number || it.model || "", qty: Number(it.quantity) || 1, kind: it.kind || "part" }));
+      O.lines = O.lines.filter((l) => l.name || l.part_number).concat(read);
+      if (!O.lines.length) O.lines.push(blankOrderLine());
+      O.status = read.length ? `Read ${read.length} line${read.length > 1 ? "s" : ""}. Check them before saving.` : (res.notes ? "Reader note: " + res.notes : "Nothing readable. Fill it in by hand.");
+    } catch (err) {
+      O.status = "";
+      O.error = err.message;
+    }
+    render();
+  }
+
+  async function saveOrder() {
+    const O = S.orderForm;
+    const lines = O.lines.map((l) => ({ ...l, name: String(l.name || "").trim(), part_number: String(l.part_number || "").trim(), qty: Number(l.qty) || 1, received: Number(l.received) || 0 })).filter((l) => l.name || l.part_number);
+    if (!lines.length) { O.error = "Add at least one item, or take a photo of the order."; return render(); }
+    O.busy = true;
+    render();
+    try {
+      const owner = uid();
+      const prev = O.id ? orders().find((x) => x.id === O.id) : null;
+      const photoPath = O.photo ? `${owner}/${uuid()}.jpg` : null;
+      const row = {
+        id: O.id || uuid(), owner, created_at: prev ? prev.created_at : nowIso(),
+        ordered_at: O.f.ordered_at ? new Date(O.f.ordered_at + "T12:00:00").toISOString() : nowIso(),
+        vendor: O.f.vendor.trim(), customer: O.f.customer.trim(), order_number: O.f.order_number.trim(), note: O.f.note.trim(),
+        status: prev ? prev.status : "open", lines, photos: [...(O.photos || []), ...(photoPath ? [photoPath] : [])],
+        source: O.photo ? "photo" : "typed",
+      };
+      if (row.status === "open" && lines.every((l) => orderLineLeft(l) <= 0)) row.status = "arrived";
+      await enqueue("violet_orders", row, photoPath ? [{ path: photoPath, blob: O.photo.blob }] : []);
+      S.orderForm = null;
+      toast("Order saved");
+      render();
+      sync();
+    } catch (err) {
+      O.busy = false;
+      O.error = "Could not save: " + err.message;
+      render();
+    }
+  }
+
+  // An arrival logged as Add stuff counts against open orders: first the order it was started from, then any open order with the same item.
+  async function applyToOrders(items, orderId, vendor) {
+    const list = orders().filter((o) => o.status === "open");
+    if (!list.length) return [];
+    const pref = orderId ? list.filter((o) => o.id === orderId) : [];
+    const rest = list.filter((o) => o.id !== orderId).sort((a, b) => String(a.ordered_at).localeCompare(String(b.ordered_at)));
+    const touched = new Map();
+    for (const it of items) {
+      let left = Number(it.quantity) || 1;
+      const pn = norm(it.part_number), nm = norm(it.name);
+      for (const o of [...pref, ...rest]) {
+        if (left <= 0) break;
+        if (!pref.includes(o) && vendor && o.vendor && norm(o.vendor) !== norm(vendor)) continue;
+        const copy = touched.get(o.id) || { ...clean(o), lines: (o.lines || []).map((l) => ({ ...l })) };
+        for (const l of copy.lines) {
+          if (left <= 0) break;
+          const need = orderLineLeft(l);
+          if (need <= 0) continue;
+          const lpn = norm(l.part_number), lnm = norm(l.name);
+          const same = (pn && lpn && pn === lpn) || (nm && lnm && (nm === lnm || nm.includes(lnm) || lnm.includes(nm)));
+          if (!same && !(pref.includes(o) && copy.lines.length === 1)) continue;
+          const take = Math.min(need, left);
+          l.received = (Number(l.received) || 0) + take;
+          left -= take;
+          touched.set(o.id, copy);
+        }
+      }
+    }
+    const done = [];
+    for (const o of touched.values()) {
+      if (o.lines.every((l) => orderLineLeft(l) <= 0)) { o.status = "arrived"; done.push(o); }
+      await enqueue("violet_orders", o);
+    }
+    if (orderId && !touched.has(orderId)) {
+      const o = list.find((x) => x.id === orderId);
+      if (o) await enqueue("violet_orders", { ...clean(o), status: "arrived" });
+    }
+    return done;
   }
 
   function orderText() {
@@ -794,7 +995,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       picking: false,
       pickQ: "",
       items: [],
-      f: { from_holder: "", to_holder: "", vendor: "", locker_id: "", site: "", symptom: "", cause: "", condition: type === "pulled" ? "failed" : "good", note: "", happened_at: localInput() },
+      f: { from_holder: "", to_holder: "", vendor: "", customer: "", locker_id: "", site: "", symptom: "", cause: "", condition: type === "pulled" ? "failed" : "good", note: "", happened_at: localInput() },
     };
   }
 
@@ -886,6 +1087,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         ${n.from ? `<label>${FROM_LABEL[L.type]}</label><select data-f="from_holder">${holderOptions(L.f.from_holder)}</select>` : ""}
         ${n.to ? `<label>${TO_LABEL[L.type]}</label><select data-f="to_holder">${holderOptions(L.f.to_holder, L.type === "returned" ? ["return"] : null)}</select>` : ""}
         ${n.vendor ? `<label>${L.type === "returned" ? "Sent to vendor (optional)" : "Vendor (optional)"}</label><input data-f="vendor" list="vendorList" value="${esc(L.f.vendor)}"><datalist id="vendorList">${vs.map((v) => `<option value="${esc(v)}">`).join("")}</datalist>` : ""}
+        <label>Customer (optional)</label><input data-f="customer" list="customerList" value="${esc(L.f.customer || "")}"><datalist id="customerList">${customers().map((v) => `<option value="${esc(v)}">`).join("")}</datalist>
         ${n.locker ? `<div class="row"><div><label>Locker ID</label><input data-f="locker_id" list="lockerList" value="${esc(L.f.locker_id)}"></div><div><label>Site</label><input data-f="site" list="siteList" value="${esc(L.f.site)}"></div></div>
           <datalist id="lockerList">${lockerIds.map((v) => `<option value="${esc(v)}">`).join("")}</datalist><datalist id="siteList">${sites.map((v) => `<option value="${esc(v)}">`).join("")}</datalist>` : ""}
         ${n.failure ? `<label>Symptom</label><select data-f="symptom"><option value="">Choose</option>${SYMPTOMS.map((s) => `<option ${L.f.symptom === s ? "selected" : ""}>${esc(s)}</option>`).join("")}</select>
@@ -956,6 +1158,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         }
         S.log.items.push(it);
         if (type === "received" && c.vendor) S.log.f.vendor = c.vendor;
+        if (c.customer && !S.log.f.customer) S.log.f.customer = c.customer;
       }
     }
     S.tab = "log";
@@ -1052,6 +1255,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const happened = new Date(f.happened_at);
     if (isNaN(happened)) return fail("The date is not valid.");
     const vendor = n.vendor ? String(f.vendor || "").trim() : "";
+    const customer = String(f.customer || "").trim();
 
     L.busy = true;
     render();
@@ -1071,7 +1275,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           c = {
             id: uuid(), owner, kind: it.kind, name: String(it.name).trim(), part_number: String(it.part_number).trim(),
             manufacturer: String(it.manufacturer || "").trim(), model: String(it.model || "").trim(), unit: String(it.unit || "each").trim() || "each",
-            vendor: L.type === "received" ? vendor : "", min_qty: 0,
+            vendor: L.type === "received" ? vendor : "", customer, min_qty: 0,
             ref_photo: usePhotoAsRef ? photoPath : null, created_at: nowIso(),
           };
           await enqueue("violet_catalog", c, takePhoto());
@@ -1079,6 +1283,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           const patch = {};
           if (!c.ref_photo && usePhotoAsRef) patch.ref_photo = photoPath;
           if (!c.vendor && vendor && L.type === "received") patch.vendor = vendor;
+          if (!c.customer && customer) patch.customer = customer;
           if (Object.keys(patch).length) await enqueue("violet_catalog", { ...clean(c), ...patch }, patch.ref_photo ? takePhoto() : []);
         }
         const e = {
@@ -1086,14 +1291,15 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           serial: String(it.serial || "").trim(), qty: Number(it.quantity), condition: f.condition,
           from_holder: n.from ? f.from_holder || null : null, to_holder: n.to ? f.to_holder || null : null,
           locker_id: n.locker ? f.locker_id.trim() : "", site: n.locker ? f.site.trim() : "",
-          symptom: n.failure ? f.symptom : "", cause: n.failure ? f.cause : "", note: f.note.trim(), vendor,
+          symptom: n.failure ? f.symptom : "", cause: n.failure ? f.cause : "", note: f.note.trim(), vendor, customer,
           source: L.photo ? (L.extracted ? "photo read" : L.barcodes.length ? "barcode" : "photo") : it.catalog_id ? "picked" : "typed",
           extracted: L.extracted ? { source: L.extracted.source, shipment: L.extracted.shipment, item: { ...it, include: undefined } } : null,
           photos: photoPath ? [photoPath] : [],
         };
         await enqueue("violet_events", e, takePhoto());
       }
-      const back = S.itemId ? "items" : "home";
+      if (L.type === "received") await applyToOrders(items, L.orderId || "", vendor);
+      const back = L.orderId ? "order" : S.itemId ? "items" : "home";
       S.log = null;
       S.tab = back;
       toast(S.demo ? "Saved to demo data" : navigator.onLine ? "Saved, uploading" : "Saved on the phone, uploads when signal returns");
@@ -1140,9 +1346,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       .filter((e) => {
         if (!q) return true;
         const c = catalogById(e.catalog_id) || {};
-        return [e.serial, e.locker_id, e.site, e.symptom, e.vendor, c.name, c.part_number, holderName(e.from_holder), holderName(e.to_holder)].some((v) => norm(v).includes(q));
+        return [e.serial, e.locker_id, e.site, e.symptom, e.vendor, e.customer, c.name, c.part_number, holderName(e.from_holder), holderName(e.to_holder)].some((v) => norm(v).includes(q));
       });
-    return `<label>Search serial, item, locker, site, vendor, or location</label><input id="historySearch" value="${esc(S.historySearch)}" placeholder="Search">
+    return `<label>Search serial, item, locker, site, vendor, customer, or location</label><input id="historySearch" value="${esc(S.historySearch)}" placeholder="Search">
       <div class="card list">${list.slice(0, S.historyLimit).map(eventLine).join("") || '<div class="muted">Nothing logged yet</div>'}</div>
       ${list.length > S.historyLimit ? `<button class="btn wide" data-act="more-history">Show more (${list.length - S.historyLimit} left)</button>` : ""}`;
   }
@@ -1249,7 +1455,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const rowsHtml = [
       ["What", TYPES[e.type] || e.type], ["Item", partLabel(c)], ["Serial", e.serial], ["How many", e.serial ? "" : fmtNum(Number(e.qty))],
       ["When it happened", fmtDate(e.happened_at)], ["Logged", fmtDate(e.created_at)], ["From", holderName(e.from_holder)], ["To", holderName(e.to_holder)],
-      ["Vendor", e.vendor], ["Locker", e.locker_id], ["Site", e.site],
+      ["Vendor", e.vendor], ["Customer", e.customer], ["Locker", e.locker_id], ["Site", e.site],
       ["Condition", CONDITIONS[e.condition] || e.condition], ["Symptom", e.symptom], ["Cause", e.cause], ["Note", e.note], ["Entered by", e.source],
     ].filter(([, v]) => v);
     openModal(`<h2>${esc(TYPES[e.type] || e.type)}</h2><table>${rowsHtml.map(([k, v]) => `<tr><td class="muted">${k}</td><td>${esc(v)}</td></tr>`).join("")}</table>
@@ -1285,23 +1491,23 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   }
   function exportStock() {
     const d = derive();
-    const out = [["location", "location kind", "item", "part number", "kind", "vendor", "serial", "quantity", "unit", "added to system"]];
+    const out = [["location", "location kind", "item", "part number", "kind", "vendor", "customer", "serial", "quantity", "unit", "added to system"]];
     for (const h of holders())
       for (const it of d.byHolder.get(h.id) || []) {
         const c = catalogById(it.catalog_id) || {};
-        out.push([h.name, LOC_KINDS[h.kind] || h.kind, c.name, c.part_number, ITEM_KINDS[c.kind] || c.kind, c.vendor, it.serial || "", it.qty, c.unit, c.created_at]);
+        out.push([h.name, LOC_KINDS[h.kind] || h.kind, c.name, c.part_number, ITEM_KINDS[c.kind] || c.kind, c.vendor, c.customer || "", it.serial || "", it.qty, c.unit, c.created_at]);
       }
     for (const s of d.lockers) {
       const c = catalogById(s.catalog_id) || {};
-      out.push([`locker ${s.locker_id} at ${s.site}`, "installed", c.name, c.part_number, ITEM_KINDS[c.kind] || c.kind, c.vendor, s.serial, 1, c.unit, c.created_at]);
+      out.push([`locker ${s.locker_id} at ${s.site}`, "installed", c.name, c.part_number, ITEM_KINDS[c.kind] || c.kind, c.vendor, c.customer || "", s.serial, 1, c.unit, c.created_at]);
     }
     download(`field-twin-violet-stock-${new Date().toISOString().slice(0, 10)}.csv`, csv(out));
   }
   function exportEvents() {
-    const out = [["when", "logged", "what", "item", "part number", "serial", "quantity", "from", "to", "vendor", "locker", "site", "condition", "symptom", "cause", "note", "entered by", "photos", "event id"]];
+    const out = [["when", "logged", "what", "item", "part number", "serial", "quantity", "from", "to", "vendor", "customer", "locker", "site", "condition", "symptom", "cause", "note", "entered by", "photos", "event id"]];
     for (const e of events().slice().sort(sortEvents)) {
       const c = catalogById(e.catalog_id) || {};
-      out.push([e.happened_at, e.created_at, TYPES[e.type] || e.type, c.name, c.part_number, e.serial, e.qty, holderName(e.from_holder), holderName(e.to_holder), e.vendor, e.locker_id, e.site, e.condition, e.symptom, e.cause, e.note, e.source, (e.photos || []).join(" "), e.id]);
+      out.push([e.happened_at, e.created_at, TYPES[e.type] || e.type, c.name, c.part_number, e.serial, e.qty, holderName(e.from_holder), holderName(e.to_holder), e.vendor, e.customer || "", e.locker_id, e.site, e.condition, e.symptom, e.cause, e.note, e.source, (e.photos || []).join(" "), e.id]);
     }
     download(`field-twin-violet-history-${new Date().toISOString().slice(0, 10)}.csv`, csv(out));
   }
@@ -1386,7 +1592,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     t = Date.now() - 2 * day;
     const dup = E.find((e) => e.type === "installed");
     if (dup) ev({ type: "installed", catalog_id: dup.catalog_id, serial: dup.serial, from_holder: H[2].id, locker_id: "L-139", site: sites[2], note: "Demo conflict: this serial was already installed" });
-    return { violet_holders: H, violet_catalog: C, violet_events: E };
+    return { violet_holders: H, violet_catalog: C, violet_events: E, violet_orders: [] };
   }
 
   // ---------- events ----------
@@ -1430,6 +1636,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         S.log.items = S.log.items.filter((it) => it.catalog_id || it.name || it.part_number);
         S.log.items.push(itemFromCatalog(c));
         if (S.log.type === "received" && c.vendor && !S.log.f.vendor) S.log.f.vendor = c.vendor;
+        if (c.customer && !S.log.f.customer) S.log.f.customer = c.customer;
       }
       S.log.picking = false;
       S.log.pickQ = "";
@@ -1474,6 +1681,36 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       case "sync": return sync();
       case "csv-stock": return exportStock();
       case "csv-events": return exportEvents();
+      case "order-new": return openOrderForm(null);
+      case "order-edit": return openOrderForm(orders().find((o) => o.id === t.dataset.order));
+      case "order-back": S.orderForm = null; return render();
+      case "order-save": return saveOrder();
+      case "order-line-add": S.orderForm.lines.push(blankOrderLine()); return render();
+      case "order-line-del": S.orderForm.lines.splice(Number(t.dataset.line), 1); if (!S.orderForm.lines.length) S.orderForm.lines.push(blankOrderLine()); return render();
+      case "order-close": {
+        const o = orders().find((x) => x.id === t.dataset.order);
+        if (!o || !window.confirm("Cancel this order? It moves to the list of arrived and cancelled orders.")) return;
+        await enqueue("violet_orders", { ...clean(o), status: "cancelled" });
+        render();
+        return sync();
+      }
+      case "order-arrive": {
+        const o = orders().find((x) => x.id === t.dataset.order);
+        if (!o) return;
+        S.log = newLog("received");
+        S.log.orderId = o.id;
+        S.log.f.vendor = o.vendor || "";
+        S.log.f.customer = o.customer || "";
+        S.log.items = (o.lines || []).filter((l) => orderLineLeft(l) > 0).map((l) => {
+          const base = { ...blankItem(), name: l.name || "", part_number: l.part_number || "", quantity: orderLineLeft(l), kind: l.kind || "part" };
+          const c = findCatalog(base);
+          return c ? { ...itemFromCatalog(c), quantity: orderLineLeft(l) } : base;
+        });
+        if (!S.log.items.length) S.log.items.push(blankItem());
+        S.tab = "log";
+        window.scrollTo(0, 0);
+        return render();
+      }
       case "copy-order": return toast((await copyText(orderText())) ? "Order list copied" : "Copy did not work on this phone");
       case "share-order":
         try {
@@ -1499,7 +1736,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       case "signout":
         await sb.auth.signOut();
         S.user = null;
-        S.server = { violet_holders: [], violet_catalog: [], violet_events: [] };
+        S.server = { violet_holders: [], violet_catalog: [], violet_events: [], violet_orders: [] };
         S.queue = [];
         return render();
       case "signup": {
@@ -1554,6 +1791,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       S.log.pickQ = t.value;
       return rerenderKeepingFocus("pickSearch");
     }
+    if (S.orderForm && t.dataset.of) { S.orderForm.f[t.dataset.of] = t.value; return; }
+    if (S.orderForm && t.dataset.ol !== undefined) { S.orderForm.lines[Number(t.dataset.ol)][t.dataset.ok] = t.value; return; }
     if (!S.log) return;
     if (t.dataset.f && t.value !== "@new") S.log.f[t.dataset.f] = t.value;
     if (t.dataset.item !== undefined && t.dataset.k) {
@@ -1581,9 +1820,15 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       return render();
     }
     if (t.id === "photoInput" && t.files && t.files[0]) return handlePhoto(t.files[0]);
+    if (t.id === "orderPhotoInput" && t.files && t.files[0]) return handleOrderPhoto(t.files[0]);
+    if (S.orderForm && t.dataset.ol !== undefined) { S.orderForm.lines[Number(t.dataset.ol)][t.dataset.ok] = t.value; return; }
     if (t.id === "itemPhotoInput" && t.files && t.files[0]) return setItemPhoto(t.dataset.cat, t.files[0]);
     if (t.id === "vendorFilter") {
       S.itemVendor = t.value;
+      return render();
+    }
+    if (t.id === "customerFilter") {
+      S.itemCustomer = t.value;
       return render();
     }
     if (S.log && t.dataset.k === "part_number") {
@@ -1631,7 +1876,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       const min = Number(f.min_qty.value);
       await enqueue("violet_catalog", {
         ...clean(c), name, part_number: pn, kind: f.kind.value, manufacturer: f.manufacturer.value.trim(), model: f.model.value.trim(),
-        vendor: f.vendor.value.trim(), unit: f.unit.value.trim() || "each", min_qty: Number.isFinite(min) && min > 0 ? min : 0,
+        vendor: f.vendor.value.trim(), customer: f.customer.value.trim(), unit: f.unit.value.trim() || "each", min_qty: Number.isFinite(min) && min > 0 ? min : 0,
       });
       closeModal();
       toast("Saved");
