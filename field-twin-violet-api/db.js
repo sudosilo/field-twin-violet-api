@@ -1,4 +1,4 @@
-// Field Twin Violet API v1
+// Field Twin Violet API v2
 // BLUE PHONE: builds the Violet tables, row level security, and the photo bucket in the shared Supabase project.
 // Runs once at boot when DATABASE_URL is set. Every statement is safe to run again.
 import pg from "pg";
@@ -60,6 +60,9 @@ export const STATEMENTS = [
     `CREATE POLICY "${t} owner" ON public.${t} FOR ALL TO authenticated
        USING (owner = auth.uid()) WITH CHECK (owner = auth.uid())`,
   ]),
+  `ALTER TABLE public.violet_catalog ADD COLUMN IF NOT EXISTS vendor TEXT NOT NULL DEFAULT ''`,
+  `ALTER TABLE public.violet_catalog ADD COLUMN IF NOT EXISTS min_qty NUMERIC NOT NULL DEFAULT 0`,
+  `ALTER TABLE public.violet_events ADD COLUMN IF NOT EXISTS vendor TEXT NOT NULL DEFAULT ''`,
   `INSERT INTO storage.buckets (id, name, public) VALUES ('violet-photos', 'violet-photos', false)
      ON CONFLICT (id) DO NOTHING`,
   `DROP POLICY IF EXISTS "violet photos owner" ON storage.objects`,
