@@ -1936,9 +1936,37 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     });
   }
 
+  // One sign in: Field Twin Teal hands over a fresh login, or a sign out, when this page sits in its Inventory tab.
+  const TWIN_PARENTS = ["https://field-twin-teal.vercel.app", "http://tauri.localhost", "https://tauri.localhost", "tauri://localhost"];
+  window.addEventListener("message", async (e) => {
+    if (!TWIN_PARENTS.includes(e.origin) || !e.data || typeof e.data !== "object" || !e.source) return;
+    const d = e.data;
+    try {
+      if (d.type === "fieldtwin-session" && d.at && d.rt) {
+        const cur = await sb.auth.getSession();
+        const curUser = cur.data && cur.data.session && cur.data.session.user;
+        if (!curUser || (d.email && curUser.email !== d.email)) {
+          const r = await sb.auth.setSession({ access_token: d.at, refresh_token: d.rt });
+          if (r.error) throw r.error;
+          if (r.data && r.data.user) await startUser(r.data.user);
+        }
+        e.source.postMessage({ type: "fieldtwin-session-ok" }, e.origin);
+      } else if (d.type === "fieldtwin-signout") {
+        await sb.auth.signOut();
+        e.source.postMessage({ type: "fieldtwin-signout-ok" }, e.origin);
+      }
+    } catch (err) {
+      e.source.postMessage({ type: "fieldtwin-session-fail", message: String((err && err.message) || err) }, e.origin);
+    }
+  });
+  function twinReady() {
+    if (window.parent === window) return;
+    for (const o of TWIN_PARENTS) { try { window.parent.postMessage({ type: "fieldtwin-ready" }, o); } catch (e) {} }
+  }
+
   boot().catch((err) => {
     $("#app").innerHTML = `<div class="card"><p class="err">The app failed to start: ${esc(err.message)}</p></div>`;
-  });
+  }).then(twinReady);
 })();
 </script>
 </body>
