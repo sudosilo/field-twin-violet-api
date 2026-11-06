@@ -729,7 +729,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         const where = whereText(d, c.id);
         return `<div class="tap row item" data-catalog="${c.id}">
           <div class="thumbcell">${photo}</div>
-          <div><b>${esc(partLabel(c))}</b>${c.company ? ' <span class="pill co">Company</span>' : ""}${low ? ' <span class="pill low">Low</span>' : ""}${bad > 1e-9 ? ' <span class="pill bad">' + fmtNum(bad) + ' not working</span>' : ""}${c._pending ? ' <span class="pill">not uploaded yet</span>' : ""}<br>
+          <div><b>${esc(partLabel(c))}</b>${c.company ? ' <span class="pill co">Company</span>' : ""}${c.customer ? ' <span class="pill">' + esc(c.customer) + '</span>' : ""}${low ? ' <span class="pill low">Low</span>' : ""}${bad > 1e-9 ? ' <span class="pill bad">' + fmtNum(bad) + ' not working</span>' : ""}${c._pending ? ' <span class="pill">not uploaded yet</span>' : ""}<br>
           <span class="muted">${fmtNum(have)} ${esc(c.unit || "each")} working${where ? " · " + esc(where) : ""}</span><br>
           <span class="muted">${esc(ITEM_KINDS[c.kind] || c.kind)}${c.vendor ? " · " + esc(c.vendor) : ""}${c.customer ? " · for " + esc(c.customer) : ""}</span></div>
         </div>`;
@@ -806,7 +806,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" name="company" style="width:auto;margin:0" ${c.company ? "checked" : ""}> Company part, issued by the company and not mine</label>
         <label>Vendor (who you buy it from)</label><input name="vendor" list="vendorList" value="${esc(c.vendor || "")}" maxlength="120">
         <datalist id="vendorList">${vs.map((v) => `<option value="${esc(v)}">`).join("")}</datalist>
-        <label>Customer (who it is for)</label><input name="customer" list="customerList" value="${esc(c.customer || "")}" maxlength="120">
+        <label>Customer (who it is for, like Amazon, HP, Otto, or a hospital)</label><input name="customer" list="customerList" value="${esc(c.customer || "")}" maxlength="120">
         <datalist id="customerList">${customers().map((v) => `<option value="${esc(v)}">`).join("")}</datalist>
         <div class="row"><div><label>Unit</label><input name="unit" value="${esc(c.unit || "each")}" maxlength="30"></div>
           <div><label>Reorder when below</label><input name="min_qty" type="number" min="0" step="any" value="${Number(c.min_qty) > 0 ? esc(c.min_qty) : ""}" placeholder="No reorder"></div></div>
@@ -1573,7 +1573,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       <p class="muted">Type what is there now. Leave a row as it is when it is right.</p>
       <form id="countForm" data-holder="${holderId}">
         <div class="count-row"><b>Item</b><b style="text-align:center">Work</b><b style="text-align:center">Do not</b></div>
-        ${rows.map((c) => { const x = countAt(d, c.id, holderId); return `<div class="count-row"><div>${esc(partLabel(c))}${c.company ? ' <span class="pill co">Company</span>' : ""}</div>
+        ${rows.map((c) => { const x = countAt(d, c.id, holderId); return `<div class="count-row"><div>${esc(partLabel(c))}${c.company ? ' <span class="pill co">Company</span>' : ""}${c.customer ? ' <span class="pill">' + esc(c.customer) + '</span>' : ""}</div>
           <input type="number" min="0" step="any" inputmode="decimal" name="g_${c.id}" value="${fmtNum(Math.max(0, x.good))}">
           <input type="number" min="0" step="any" inputmode="decimal" name="b_${c.id}" value="${fmtNum(Math.max(0, x.bad))}"></div>`; }).join("") || '<p class="muted">Nothing counted by quantity is in this location yet. Use Add stuff to put items here first.</p>'}
         ${serialNote}
