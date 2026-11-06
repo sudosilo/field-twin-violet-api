@@ -1375,6 +1375,14 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     render();
   }
 
+  // Turns the label reader's raw error into plain words.
+  function readerError(msg, status) {
+    const m = String(msg || "");
+    if (/credit balance is too low/i.test(m)) return "The label reader's Claude account is out of credit, so the photo was not read. Pick the part from the parts list instead, or add credit and take the photo again.";
+    if (/x-api-key|authentication|invalid api key/i.test(m)) return "The label reader's Claude key was turned down, so the photo was not read. Pick the part from the parts list instead.";
+    if (/overloaded|529/i.test(m)) return "The label reader is busy right now. Take the photo again in a minute, or pick the part from the parts list.";
+    return m || `label reader answered ${status}`;
+  }
   async function handlePhoto(file) {
     const L = S.log;
     L.error = "";
@@ -1403,7 +1411,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           body: JSON.stringify({ image: dataUrl, barcodes: L.barcodes }),
         });
         const j = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(j.error || `label reader answered ${r.status}`);
+        if (!r.ok) throw new Error(readerError(j.error, r.status));
         L.extracted = j.result;
         let read = (j.result.items || []).map((it) => {
           const base = { ...blankItem(), ...it, include: true };
