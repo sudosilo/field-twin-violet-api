@@ -1489,6 +1489,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       </div>
       <h2>Export</h2>
       <div class="card row"><button class="btn" data-act="csv-stock">Stock CSV</button><button class="btn" data-act="csv-events">History CSV</button></div>
+      <div class="card"><b>Company parts list</b><p class="muted">Adds every part on the NV11 warehouse list as a company part for Amazon, ready to count. Parts already in here are kept and only get marked as company parts.</p><button class="btn primary wide" data-act="load-nv11">Add the NV11 company parts list</button></div>
       <h2>Label reader</h2>
       <form id="settingsForm" class="card">
         <p class="muted">Signed in, the label reader works with nothing filled in here. These boxes are only for a different address or for demo mode.</p>
@@ -1555,6 +1556,34 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       a.remove();
     }, 1000);
   }
+  // ----- Company parts list -----
+  // The warehouse list for storage location NV11 (plant 5104), typed in from the company spreadsheet. Material number
+  // becomes the part number and the old material number goes in Model, so either one finds the part in search.
+  const NV11_PARTS = [{"pn":"30000006490","name":"AMZ OCCUPANCY SENSR COLLECTR - 5 LIGHT","old":"20100087"},{"pn":"30000006491","name":"AMZ OCCUPANCY SENSOR EMITTER - 5 LIGHT","old":"20100088"},{"pn":"30000006556","name":"AMZ OCCUPANCY SENSR COLLECTR - 3 LIGHT","old":"20100480"},{"pn":"30000006557","name":"AMZ OCCUPANCY SENSOR EMITTER - 3 LIGHT","old":"20100481"},{"pn":"30000006574","name":"AMZ ADA KEYPAD/GEN2.5/GEN3.0","old":"20100530"},{"pn":"30000006598","name":"302 KEY, LOCKER AMAZON GEN2.5/GEN3","old":"20100632"},{"pn":"30000006630","name":"APC UPS BATTERY REPLACEMENT RBC17","old":"20101450"},{"pn":"30000006692","name":"AMZ LEVELER HOLE PLUGS","old":"20109040"},{"pn":"30000006710","name":"CAMERA COVER","old":"20109215"},{"pn":"30000006738","name":"LATCH HOOK KITS (10 PCS SCREWS, 5 LATCHES)","old":"20109325"},{"pn":"30000006750","name":"ACRYLIC PANEL FOR SCANNER GEN 3.0","old":"20109405"},{"pn":"30000006756","name":"12V ADAPTOR FOR SCREEN NA","old":"20109414"},{"pn":"30000006801","name":"BRACKETS FOR 10.4\" SCREEN","old":"20109514"},{"pn":"30000006817","name":"GEN 3.0 SCREEN SHADING CURTAIN W/OUT","old":"20109557"},{"pn":"30000006824","name":"DATA CABLE FOR UPS APC-BR700G","old":"20190451"},{"pn":"30000006842","name":"ODIN MOTOR DOOR LOCK V1.1","old":"40100065"},{"pn":"30000006851","name":"FISHEYE CAMERA SY017HD","old":""},{"pn":"30000006853","name":"DOOR LOCK 6TH GEN (POST GEN2.5)","old":"20100080C"},{"pn":"30000006854","name":"LP COM/ALARM BOARD REVC (PRE GEN2.5)","old":"20100151C"},{"pn":"30000007024","name":"AMZ MD DOOR (LEFT) G3 OUTDOOR SQUID INK","old":"20108521S"},{"pn":"30000007031","name":"AMZ SM DOOR (LEFT) G3 OUTDOOR SQUID INK","old":"20108523S"},{"pn":"30000007059","name":"MD DOOR G3 INDOOR CORE LKR","old":"20108532S"},{"pn":"30000007104","name":"AMZ DOOR PIN BUSHING STAINLESS STEEL (1 BAG)","old":"20109536A"},{"pn":"30000007110","name":"ODIN MTR DR LOCK (NEW SPRING)","old":"40100011A"},{"pn":"30000007121","name":"IPC ADVANTECH ARK2232L 1902-T12V NA","old":"20100400F"},{"pn":"30000007126","name":"KRISTAL 10.4\" LCD104-019 INDOOR","old":"20100449"},{"pn":"30000007127","name":"KRISTAL 10.4\" LCD104-020 OUTDOOR","old":"20100449A"},{"pn":"30000007128","name":"UPS APC-BR700G NA","old":"20100450"},{"pn":"30000007129","name":"A/C","old":"20100458"},{"pn":"30000007134","name":"AMAZON ESIM","old":"20107705"},{"pn":"30000007135","name":"LAN SWITCH D-LINK NA","old":"20109537"},{"pn":"30000007142","name":"ODIN BATTERY PACK (PANASONIC/DESAY)","old":"40100024"},{"pn":"30000007181","name":"GEN4.0 UPR EMRGNCY RAIL KIT SQUID INK","old":"40101010S"},{"pn":"30000007182","name":"IP C-BOARD 20PT (DOOR-CTRL PCB)","old":"20100401F"},{"pn":"30000007185","name":"ODIN LPWAN MODULE BG95","old":"40100033A"},{"pn":"30000007189","name":"ODIN BLE CORE-BOARD (nRF5x) V1.2","old":"40100036F"},{"pn":"30000007216","name":"POWER ADAPTOR 12V FOR TOUCH SCREEN","old":"20100030B"},{"pn":"30000007228","name":"AMAZON IP C-BOARD POWER CABLE REV","old":"20100410E"},{"pn":"30000007243","name":"RB 30000007471 OR 30000007472","old":"20100003C"},{"pn":"30000007244","name":"C-BOARD 23-PT (DRCTRL PCB)","old":"20100401G"},{"pn":"30000007245","name":"AMZ LOCKER CRADLEPT PGRMD BY NOC","old":"20100768"},{"pn":"30000007294","name":"333.0 G SCANNER","old":"20100070"},{"pn":"30000007522","name":"ETHERNET TO USB FOR UPS TO IPC","old":"20100451"}];
+  async function loadNv11() {
+    let added = 0, updated = 0;
+    const owner = uid();
+    for (const p of NV11_PARTS) {
+      const have = catalog().find((c) => norm(c.part_number) === norm(p.pn));
+      if (have) {
+        const patch = {};
+        if (!have.company) patch.company = true;
+        if (!have.customer) patch.customer = "Amazon";
+        if (!have.model && p.old) patch.model = p.old;
+        if (Object.keys(patch).length) { await enqueue("violet_catalog", { ...clean(have), ...patch }); updated++; }
+        continue;
+      }
+      await enqueue("violet_catalog", {
+        id: uuid(), owner, kind: "part", name: p.name, part_number: p.pn, manufacturer: "", model: p.old || "", unit: "each",
+        vendor: "", customer: "Amazon", min_qty: 0, ref_photo: null, created_at: nowIso(), company: true,
+      });
+      added++;
+    }
+    toast(added || updated ? `Company list loaded: ${added} new items${updated ? ", " + updated + " updated" : ""}` : "Company list was already loaded");
+    render();
+    sync();
+  }
+
   // ----- Count stuff -----
   // Pick a location, then type how many of each item there work and how many do not. The app compares that with what
   // it expected and logs the difference: Tested events move parts between working and not working, and anything
@@ -1563,14 +1592,16 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const hs = holders();
     openModal(`<h2>Count which location?</h2><div class="card list">${hs.map((h) => `<div class="tap" data-act="count-loc" data-holder="${h.id}"><b>${esc(h.name)}</b> <span class="muted">${esc(LOC_KINDS[h.kind] || h.kind)}</span></div>`).join("")}</div>`);
   }
-  function countForm(holderId, onlyCat) {
+  function countForm(holderId, onlyCat, all) {
     const d = derive();
-    const ids = onlyCat ? [onlyCat] : [...new Set((d.byHolder.get(holderId) || []).filter((it) => it.kind === "qty").map((it) => it.catalog_id))];
-    const rows = ids.map((cid) => catalogById(cid)).filter(Boolean).sort((a, b) => partLabel(a).localeCompare(partLabel(b)));
+    const here = new Set((d.byHolder.get(holderId) || []).filter((it) => it.kind === "qty").map((it) => it.catalog_id));
+    const ids = onlyCat ? [onlyCat] : all ? catalog().filter((c) => here.has(c.id) || !(d.byCatalog.get(c.id) || []).some((it) => it.kind === "serial")).map((c) => c.id) : [...here];
+    const rows = ids.map((cid) => catalogById(cid)).filter(Boolean).sort((a, b) => (b.company ? 1 : 0) - (a.company ? 1 : 0) || partLabel(a).localeCompare(partLabel(b)));
     const serialNote = (d.byHolder.get(holderId) || []).some((it) => it.kind === "serial")
       ? '<p class="muted">Parts tracked by serial number are marked one at a time with the Works or Does not work button on each item page.</p>' : "";
     openModal(`<h2>Count ${esc(holderName(holderId))}</h2>
       <p class="muted">Type what is there now. Leave a row as it is when it is right.</p>
+      ${!onlyCat && !all ? `<button class="btn wide" data-act="count-all" data-holder="${holderId}">Show every item, including ones not here yet</button>` : ""}
       <form id="countForm" data-holder="${holderId}">
         <div class="count-row"><b>Item</b><b style="text-align:center">Work</b><b style="text-align:center">Do not</b></div>
         ${rows.map((c) => { const x = countAt(d, c.id, holderId); return `<div class="count-row"><div>${esc(partLabel(c))}${c.company ? ' <span class="pill co">Company</span>' : ""}${c.customer ? ' <span class="pill">' + esc(c.customer) + '</span>' : ""}</div>
@@ -1806,6 +1837,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       case "clear-loc": S.itemLoc = ""; return render();
       case "edit-item": return editItemForm(t.dataset.cat);
       case "count-pick": return countPick();
+      case "load-nv11": return loadNv11();
+      case "count-all": return countForm(t.dataset.holder, "", true);
       case "count-loc": return countForm(t.dataset.holder);
       case "count-one": return countForm(t.dataset.holder, t.dataset.cat);
       case "serial-test": return serialTest(t);
