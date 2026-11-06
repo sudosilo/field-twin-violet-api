@@ -4,7 +4,7 @@ name: Field Twin Violet database
 # depends on a login saved on a phone. Every file is safe to run again.
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths: ['supabase/**', '.github/workflows/field-twin-violet-db-v1.yml']
   workflow_dispatch:
 
