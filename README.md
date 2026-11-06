@@ -8,6 +8,6 @@ Live at field-twin-violet.vercel.app
 
 This app is checked every morning by Control Troll.
 
-Latest change. 2026-10-21, v2026.10.21. Sign in now also works when handed over from one more Field Twin app. Removed an address from the app.
+Latest change. 2026-11-06, v2026.11.06. Company parts, working and not working counts, and a Count stuff action for doing inventory.
 
 Full history is in CHANGELOG.md.

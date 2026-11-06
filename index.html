@@ -54,7 +54,10 @@
   .tap { cursor: pointer; }
   .badge { display: inline-block; font-size: 12px; padding: 2px 7px; border-radius: 6px; background: var(--chip); margin-right: 4px; }
   .b-received { background: #dcefe0; } .b-moved { background: #e6e2f3; } .b-installed { background: #dbe9f4; }
-  .b-pulled { background: #f8d6cf; } .b-returned { background: #f3e6c8; } .b-written_off { background: #e8dcd2; }
+  .b-pulled { background: #f8d6cf; } .b-returned { background: #f3e6c8; } .b-written_off { background: #e8dcd2; } .b-checked { background: #d4e4f7; }
+  .pill.co { background: #0b4ea2; color: #fff; } .pill.bad { background: #f8d6cf; }
+  .count-row { display: grid; grid-template-columns: 1fr 74px 74px; gap: 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid #e3e8ef; }
+  .count-row input { margin: 0; text-align: center; }
   .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
   .tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
   .tile.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
@@ -160,6 +163,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     written_off: { label: "Used up or tossed", verb: "Used up or tossed", desc: "Consumables used up, or junk thrown away" },
   };
   const TYPES = Object.fromEntries(Object.entries(ACTIONS).map(([k, v]) => [k, v.verb]));
+  TYPES.checked = "Tested";
+  // Counts split two ways: working (good) and not working (damaged or failed).
+  const bucket = (c) => (c === "damaged" || c === "failed" ? "bad" : "good");
   const LOC_KINDS = { tech: "On me", truck: "Truck", home: "Home", storage: "Storage unit", return: "Return box", other: "Other" };
   const QUICK_LOCS = [["My truck", "truck"], ["Home shelf", "home"], ["Storage unit", "storage"], ["On me", "tech"], ["Return box", "return"]];
   const ITEM_KINDS = { part: "Part", tool: "Tool", consumable: "Consumable" };
@@ -307,6 +313,11 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const conflicts = [];
     const flag = (e, text) => conflicts.push({ event: e, text });
     for (const e of ev) {
+      if (e.serial && e.type === "checked") {
+        const prev = serials.get(norm(e.serial));
+        if (prev) serials.set(norm(e.serial), { ...prev, cond: bucket(e.condition), checked: e });
+        continue;
+      }
       if (e.serial) {
         const key = norm(e.serial);
         const prev = serials.get(key);
@@ -325,7 +336,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           else if (where === "locker" && e.type !== "installed") flag(e, `Serial ${e.serial} logged from a location but is installed at ${at}`);
           else if (where === "written off") flag(e, `Serial ${e.serial} was already tossed`);
         }
-        const st = { serial: e.serial, catalog_id: e.catalog_id, last: e, holder: "", locker_id: "", site: "", where: "unknown" };
+        const st = { serial: e.serial, catalog_id: e.catalog_id, last: e, holder: "", locker_id: "", site: "", where: "unknown", cond: bucket(e.condition) };
         if (e.type === "installed") Object.assign(st, { where: "locker", locker_id: e.locker_id, site: e.site });
         else if (e.type === "written_off") st.where = "written off";
         else if (e.to_holder) Object.assign(st, { where: "holder", holder: e.to_holder });
@@ -333,13 +344,19 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         serials.set(key, st);
       } else {
         const n = Number(e.qty) || 0;
-        const add = (h, d) => {
+        const add = (h, b, d) => {
           if (!h) return;
-          const k = h + "|" + e.catalog_id;
+          const k = h + "|" + e.catalog_id + "|" + b;
           qty.set(k, (qty.get(k) || 0) + d);
         };
-        add(e.from_holder, -n);
-        add(e.to_holder, n);
+        if (e.type === "checked") {
+          const h = e.to_holder || e.from_holder;
+          add(h, bucket((e.extracted && e.extracted.from_condition) || "good"), -n);
+          add(h, bucket(e.condition), n);
+        } else {
+          add(e.from_holder, bucket(e.condition), -n);
+          add(e.to_holder, bucket(e.condition), n);
+        }
       }
     }
     const byHolder = new Map();
@@ -350,29 +367,54 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       if (!byCatalog.has(item.catalog_id)) byCatalog.set(item.catalog_id, []);
       byCatalog.get(item.catalog_id).push({ ...item, holder: h });
     };
-    for (const st of serials.values()) if (st.where === "holder") push(st.holder, { kind: "serial", catalog_id: st.catalog_id, serial: st.serial, qty: 1, last: st.last });
+    for (const st of serials.values()) if (st.where === "holder") push(st.holder, { kind: "serial", catalog_id: st.catalog_id, serial: st.serial, qty: 1, last: st.last, cond: st.cond || "good" });
     for (const [k, n] of qty) {
       if (Math.abs(n) < 1e-9) continue;
-      const [h, c] = k.split("|");
-      push(h, { kind: "qty", catalog_id: c, qty: n });
+      const [h, c, b] = k.split("|");
+      push(h, { kind: "qty", catalog_id: c, qty: n, cond: b || "good" });
     }
     const lockers = [...serials.values()].filter((s) => s.where === "locker");
     return { serials, byHolder, byCatalog, lockers, conflicts };
   }
 
-  // On hand means sitting in a location that is not a return box.
+  // On hand means working and sitting in a location that is not a return box. Not working ones are counted apart.
   function onHand(d, catalogId) {
     let n = 0;
     for (const it of d.byCatalog.get(catalogId) || []) {
       const h = holderById(it.holder);
-      if (!h || h.kind !== "return") n += it.qty;
+      if ((!h || h.kind !== "return") && it.cond !== "bad") n += it.qty;
     }
     return n;
   }
+  function notWorking(d, catalogId) {
+    let n = 0;
+    for (const it of d.byCatalog.get(catalogId) || []) if (it.cond === "bad") n += it.qty;
+    return n;
+  }
+  // Working and not working count of one item in one location.
+  function countAt(d, catalogId, holderId) {
+    const r = { good: 0, bad: 0, serials: [] };
+    for (const it of d.byCatalog.get(catalogId) || []) {
+      if (it.holder !== holderId) continue;
+      r[it.cond === "bad" ? "bad" : "good"] += it.qty;
+      if (it.kind === "serial") r.serials.push(it);
+    }
+    return r;
+  }
+  function splitText(g, b, unit) {
+    const parts = [];
+    if (Math.abs(g) > 1e-9 || !Math.abs(b)) parts.push(fmtNum(g) + " working");
+    if (Math.abs(b) > 1e-9) parts.push(fmtNum(b) + " not working");
+    return parts.join(", ");
+  }
   function whereText(d, catalogId) {
     const per = new Map();
-    for (const it of d.byCatalog.get(catalogId) || []) per.set(it.holder, (per.get(it.holder) || 0) + it.qty);
-    return [...per].filter(([, n]) => Math.abs(n) > 1e-9).map(([h, n]) => `${holderName(h)} ${fmtNum(n)}`).join(", ");
+    for (const it of d.byCatalog.get(catalogId) || []) {
+      const p = per.get(it.holder) || { g: 0, b: 0 };
+      p[it.cond === "bad" ? "b" : "g"] += it.qty;
+      per.set(it.holder, p);
+    }
+    return [...per].filter(([, p]) => Math.abs(p.g) + Math.abs(p.b) > 1e-9).map(([h, p]) => `${holderName(h)} ${fmtNum(p.g)}${Math.abs(p.b) > 1e-9 ? " plus " + fmtNum(p.b) + " not working" : ""}`).join(", ");
   }
   function orderList(d) {
     return catalog()
@@ -632,7 +674,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       : "";
     return `${conflictCard}
       <h2>What happened?</h2>
-      <div class="actions">${actions}</div>
+      <div class="actions">${actions}<button class="action" data-act="count-pick"><b>Count stuff</b><span>Count a location: how many of each item work and how many do not</span></button></div>
       <h2>Summary</h2>
       <div class="tiles">
         <div class="tile tap" data-tab="items"><span class="muted">Items</span><b>${cat.length}</b>kinds of parts and tools</div>
@@ -658,6 +700,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     if (S.itemKind) list = list.filter((c) => c.kind === S.itemKind);
     if (S.itemVendor) list = list.filter((c) => (c.vendor || "") === S.itemVendor);
     if (S.itemCustomer) list = list.filter((c) => (c.customer || "") === S.itemCustomer);
+    if (S.itemCompany === "company") list = list.filter((c) => c.company);
+    if (S.itemCompany === "mine") list = list.filter((c) => !c.company);
+    if (S.itemCompany === "bad") list = list.filter((c) => notWorking(d, c.id) > 1e-9);
     if (S.itemLoc) list = list.filter((c) => (d.byCatalog.get(c.id) || []).some((it) => it.holder === S.itemLoc));
     if (q) list = list.filter((c) => [c.name, c.part_number, c.model, c.manufacturer, c.vendor, c.customer].some((v) => norm(v).includes(q)) || [...d.serials.values()].some((s) => s.catalog_id === c.id && norm(s.serial).includes(q)));
     list.sort((a, b) => partLabel(a).localeCompare(partLabel(b)));
@@ -672,23 +717,27 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const customerSel = cs.length
       ? `<select id="customerFilter"><option value="">Every customer</option>${cs.map((v) => `<option ${S.itemCustomer === v ? "selected" : ""}>${esc(v)}</option>`).join("")}</select>`
       : "";
-    const locChip = S.itemLoc ? `<div class="chips"><span class="pill on">In ${esc(holderName(S.itemLoc))}</span><button class="btn small" data-act="clear-loc">Show all items</button></div>` : "";
+    const locChip = S.itemLoc ? `<div class="chips"><span class="pill on">In ${esc(holderName(S.itemLoc))}</span><button class="btn small" data-act="clear-loc">Show all items</button><button class="btn small primary" data-act="count-loc" data-holder="${S.itemLoc}">Count this location</button></div>` : "";
+    const ownChips = [["", "Company and mine"], ["company", "Company parts"], ["mine", "Mine"], ["bad", "Not working"]]
+      .map(([k, v]) => `<button class="btn small ${(S.itemCompany || "") === k ? "on" : ""}" data-act="own-filter" data-own="${k}">${esc(v)}</button>`).join("");
     const rowsHtml = list
       .map((c) => {
         const have = onHand(d, c.id);
+        const bad = notWorking(d, c.id);
         const low = Number(c.min_qty) > 0 && have < Number(c.min_qty);
         const photo = c.ref_photo ? `<img class="thumb" data-photo="${esc(c.ref_photo)}" alt="">` : `<div class="thumb empty">No photo</div>`;
         const where = whereText(d, c.id);
         return `<div class="tap row item" data-catalog="${c.id}">
           <div class="thumbcell">${photo}</div>
-          <div><b>${esc(partLabel(c))}</b>${low ? ' <span class="pill low">Low</span>' : ""}${c._pending ? ' <span class="pill">not uploaded yet</span>' : ""}<br>
-          <span class="muted">${fmtNum(have)} ${esc(c.unit || "each")} on hand${where ? " · " + esc(where) : ""}</span><br>
+          <div><b>${esc(partLabel(c))}</b>${c.company ? ' <span class="pill co">Company</span>' : ""}${low ? ' <span class="pill low">Low</span>' : ""}${bad > 1e-9 ? ' <span class="pill bad">' + fmtNum(bad) + ' not working</span>' : ""}${c._pending ? ' <span class="pill">not uploaded yet</span>' : ""}<br>
+          <span class="muted">${fmtNum(have)} ${esc(c.unit || "each")} working${where ? " · " + esc(where) : ""}</span><br>
           <span class="muted">${esc(ITEM_KINDS[c.kind] || c.kind)}${c.vendor ? " · " + esc(c.vendor) : ""}${c.customer ? " · for " + esc(c.customer) : ""}</span></div>
         </div>`;
       })
       .join("");
     return `${locChip}
       <div class="chips">${kindChips}</div>
+      <div class="chips">${ownChips}</div>
       ${vendorSel}
       ${customerSel}
       <label>Search name, part number, serial, maker, vendor, or customer</label><input id="itemSearch" value="${esc(S.itemSearch)}" placeholder="Search">
@@ -704,15 +753,17 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     }
     const d = derive();
     const have = onHand(d, c.id);
+    const bad = notWorking(d, c.id);
     const low = Number(c.min_qty) > 0 && have < Number(c.min_qty);
     const evs = events().filter((e) => e.catalog_id === id).sort(sortEvents).reverse();
+    const usedJobs = evs.filter((e) => e.type === "installed").reduce((a, e) => a + (Number(e.qty) || 0), 0);
     const photos = [...new Set(evs.flatMap((e) => e.photos || []))].filter((p) => p !== c.ref_photo);
-    const where = (d.byCatalog.get(id) || []).reduce((m, it) => m.set(it.holder, (m.get(it.holder) || 0) + it.qty), new Map());
+    const where = (d.byCatalog.get(id) || []).reduce((m, it) => m.set(it.holder, (m.get(it.holder) || 0) + Math.abs(it.qty)), new Map());
     const serialsHere = (d.byCatalog.get(id) || []).filter((it) => it.kind === "serial");
     const installed = d.lockers.filter((s) => s.catalog_id === id);
     const firstEvent = evs.length ? evs[evs.length - 1] : null;
     const details = [
-      ["Kind", ITEM_KINDS[c.kind] || c.kind], ["Part number", c.part_number], ["Maker", c.manufacturer], ["Model", c.model],
+      ["Kind", ITEM_KINDS[c.kind] || c.kind], ["Belongs to", c.company ? "The company" : "Me"], ["Part number", c.part_number], ["Maker", c.manufacturer], ["Model", c.model],
       ["Vendor", c.vendor], ["Customer", c.customer], ["Unit", c.unit], ["Reorder when below", Number(c.min_qty) > 0 ? fmtNum(Number(c.min_qty)) : ""],
       ["Added to the system", fmtDate(c.created_at)], ["First logged", firstEvent ? fmtDate(firstEvent.happened_at) : ""],
     ].filter(([, v]) => v);
@@ -720,16 +771,17 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       .map(([k, a]) => `<button class="btn small" data-start="${k}" data-for="${c.id}">${esc(a.label)}</button>`)
       .join("");
     return `<button class="btn small back" data-act="item-back">Back to items</button>
-      <h2>${esc(partLabel(c))}${low ? ' <span class="pill low">Low</span>' : ""}</h2>
+      <h2>${esc(partLabel(c))}${c.company ? ' <span class="pill co">Company</span>' : ""}${low ? ' <span class="pill low">Low</span>' : ""}</h2>
       <div class="card">
         ${c.ref_photo ? `<img class="full" data-photo="${esc(c.ref_photo)}" alt="">` : '<p class="muted">No photo yet.</p>'}
         <label class="btn wide" style="text-align:center;margin-top:8px">${c.ref_photo ? "Replace photo" : "Add photo"}<input id="itemPhotoInput" data-cat="${c.id}" type="file" accept="image/*" capture="environment" hidden></label>
       </div>
-      <div class="tiles"><div class="tile"><span class="muted">On hand</span><b>${fmtNum(have)}</b>${esc(c.unit || "each")}</div>
-        <div class="tile"><span class="muted">Installed</span><b>${installed.length}</b>at lockers</div></div>
+      <div class="tiles"><div class="tile"><span class="muted">Working</span><b>${fmtNum(have)}</b>${esc(c.unit || "each")}</div>
+        <div class="tile"><span class="muted">Not working</span><b>${fmtNum(bad)}</b>${esc(c.unit || "each")}</div>
+        <div class="tile"><span class="muted">Used on jobs</span><b>${fmtNum(usedJobs)}</b>installed</div></div>
       <h3>Where it is</h3>
-      <div class="card list">${[...where].filter(([, n]) => Math.abs(n) > 1e-9).map(([h, n]) => `<div class="row" style="align-items:center"><div class="tap" data-loc="${h}"><b>${esc(holderName(h))}</b> <span class="muted">${fmtNum(n)} ${esc(c.unit || "each")}</span></div><button class="btn small primary" style="flex:0 0 auto" data-start="moved" data-for="${c.id}" data-from="${h}">Move</button></div>`).join("") || '<div class="muted">Not in any location right now</div>'}</div>
-      ${serialsHere.length ? `<h3>Serials on hand</h3><div class="card list">${serialsHere.map((it) => `<div class="tap" data-serial="${esc(it.serial)}">SN ${esc(it.serial)} <span class="muted">${esc(holderName(it.holder))} · since ${esc(fmtDate(it.last.happened_at))}</span></div>`).join("")}</div>` : ""}
+      <div class="card list">${[...where].filter(([, n]) => Math.abs(n) > 1e-9).map(([h, n]) => `<div class="row" style="align-items:center"><div class="tap" data-loc="${h}"><b>${esc(holderName(h))}</b> <span class="muted">${(() => { const x = countAt(d, c.id, h); return esc(splitText(x.good, x.bad)); })()}</span></div><button class="btn small" style="flex:0 0 auto" data-act="count-one" data-cat="${c.id}" data-holder="${h}">Count</button><button class="btn small primary" style="flex:0 0 auto" data-start="moved" data-for="${c.id}" data-from="${h}">Move</button></div>`).join("") || '<div class="muted">Not in any location right now</div>'}</div>
+      ${serialsHere.length ? `<h3>Serials on hand</h3><div class="card list">${serialsHere.map((it) => `<div class="row" style="align-items:center"><div class="tap" data-serial="${esc(it.serial)}">SN ${esc(it.serial)} ${it.cond === "bad" ? '<span class="pill bad">not working</span>' : ""} <span class="muted">${esc(holderName(it.holder))} · since ${esc(fmtDate(it.last.happened_at))}</span></div><button class="btn small" style="flex:0 0 auto" data-act="serial-test" data-cat="${c.id}" data-holder="${it.holder}" data-sn="${esc(it.serial)}" data-to="${it.cond === "bad" ? "good" : "failed"}">${it.cond === "bad" ? "Works" : "Does not work"}</button></div>`).join("")}</div>` : ""}
       ${installed.length ? `<h3>Installed at lockers</h3><div class="card list">${installed.map((s) => `<div class="tap" data-serial="${esc(s.serial)}">SN ${esc(s.serial)} <span class="muted">locker ${esc(s.locker_id)} · ${esc(s.site)}</span></div>`).join("")}</div>` : ""}
       <h3>Details</h3>
       <div class="card"><table>${details.map(([k, v]) => `<tr><td class="muted">${esc(k)}</td><td>${esc(v)}</td></tr>`).join("")}</table>
@@ -751,6 +803,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         <div class="row"><div><label>Part number</label><input name="part_number" value="${esc(c.part_number)}" maxlength="80"></div>
           <div><label>Kind</label><select name="kind">${Object.entries(ITEM_KINDS).map(([k, v]) => `<option value="${k}" ${c.kind === k ? "selected" : ""}>${v}</option>`).join("")}</select></div></div>
         <div class="row"><div><label>Maker</label><input name="manufacturer" value="${esc(c.manufacturer)}" maxlength="120"></div><div><label>Model</label><input name="model" value="${esc(c.model)}" maxlength="120"></div></div>
+        <label style="display:flex;gap:10px;align-items:center"><input type="checkbox" name="company" style="width:auto;margin:0" ${c.company ? "checked" : ""}> Company part, issued by the company and not mine</label>
         <label>Vendor (who you buy it from)</label><input name="vendor" list="vendorList" value="${esc(c.vendor || "")}" maxlength="120">
         <datalist id="vendorList">${vs.map((v) => `<option value="${esc(v)}">`).join("")}</datalist>
         <label>Customer (who it is for)</label><input name="customer" list="customerList" value="${esc(c.customer || "")}" maxlength="120">
@@ -1008,7 +1061,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       picking: false,
       pickQ: "",
       items: [],
-      f: { from_holder: "", to_holder: "", vendor: "", customer: "", locker_id: "", site: "", symptom: "", cause: "", condition: type === "pulled" ? "failed" : "good", note: "", happened_at: localInput() },
+      f: { from_holder: "", to_holder: "", vendor: "", customer: "", locker_id: "", site: "", symptom: "", cause: "", condition: type === "pulled" || type === "returned" ? "failed" : "good", note: "", happened_at: localInput() },
     };
   }
 
@@ -1502,17 +1555,85 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       a.remove();
     }, 1000);
   }
+  // ----- Count stuff -----
+  // Pick a location, then type how many of each item there work and how many do not. The app compares that with what
+  // it expected and logs the difference: Tested events move parts between working and not working, and anything
+  // extra or missing is logged as found or as missing so the counts match what is on the shelf.
+  function countPick() {
+    const hs = holders();
+    openModal(`<h2>Count which location?</h2><div class="card list">${hs.map((h) => `<div class="tap" data-act="count-loc" data-holder="${h.id}"><b>${esc(h.name)}</b> <span class="muted">${esc(LOC_KINDS[h.kind] || h.kind)}</span></div>`).join("")}</div>`);
+  }
+  function countForm(holderId, onlyCat) {
+    const d = derive();
+    const ids = onlyCat ? [onlyCat] : [...new Set((d.byHolder.get(holderId) || []).filter((it) => it.kind === "qty").map((it) => it.catalog_id))];
+    const rows = ids.map((cid) => catalogById(cid)).filter(Boolean).sort((a, b) => partLabel(a).localeCompare(partLabel(b)));
+    const serialNote = (d.byHolder.get(holderId) || []).some((it) => it.kind === "serial")
+      ? '<p class="muted">Parts tracked by serial number are marked one at a time with the Works or Does not work button on each item page.</p>' : "";
+    openModal(`<h2>Count ${esc(holderName(holderId))}</h2>
+      <p class="muted">Type what is there now. Leave a row as it is when it is right.</p>
+      <form id="countForm" data-holder="${holderId}">
+        <div class="count-row"><b>Item</b><b style="text-align:center">Work</b><b style="text-align:center">Do not</b></div>
+        ${rows.map((c) => { const x = countAt(d, c.id, holderId); return `<div class="count-row"><div>${esc(partLabel(c))}${c.company ? ' <span class="pill co">Company</span>' : ""}</div>
+          <input type="number" min="0" step="any" inputmode="decimal" name="g_${c.id}" value="${fmtNum(Math.max(0, x.good))}">
+          <input type="number" min="0" step="any" inputmode="decimal" name="b_${c.id}" value="${fmtNum(Math.max(0, x.bad))}"></div>`; }).join("") || '<p class="muted">Nothing counted by quantity is in this location yet. Use Add stuff to put items here first.</p>'}
+        ${serialNote}
+        <label>Note</label><input name="note" maxlength="200" placeholder="Like tested on the bench">
+        ${rows.length ? '<button class="btn primary wide" type="submit">Save count</button>' : ""}
+      </form>`);
+  }
+  async function saveCount(f) {
+    const holderId = f.dataset.holder;
+    const d = derive();
+    const note = f.note.value.trim();
+    const owner = uid();
+    let made = 0;
+    const ev = (type, cid, qty, cond, extra) => ({
+      id: uuid(), owner, happened_at: nowIso(), created_at: nowIso(), type, catalog_id: cid, serial: "", qty, condition: cond,
+      from_holder: null, to_holder: null, locker_id: "", site: "", symptom: "", cause: "", note, vendor: "", customer: "",
+      source: "count", extracted: null, photos: [], ...extra,
+    });
+    for (const el of f.querySelectorAll('input[name^="g_"]')) {
+      const cid = el.name.slice(2);
+      const G = Number(el.value), B = Number(f["b_" + cid].value);
+      if (!Number.isFinite(G) || !Number.isFinite(B) || G < 0 || B < 0) continue;
+      const x = countAt(d, cid, holderId);
+      let g = x.good, b = x.bad;
+      const out = [];
+      if (B > b && g > G) { const k = Math.min(B - b, g - G); out.push(ev("checked", cid, k, "failed", { to_holder: holderId, extracted: { from_condition: "good" } })); g -= k; b += k; }
+      if (G > g && b > B) { const k = Math.min(G - g, b - B); out.push(ev("checked", cid, k, "good", { to_holder: holderId, extracted: { from_condition: "failed" } })); g += k; b -= k; }
+      if (G > g) out.push(ev("received", cid, G - g, "good", { to_holder: holderId, note: note || "Found during count" }));
+      if (G < g) out.push(ev("written_off", cid, g - G, "good", { from_holder: holderId, note: note || "Missing at count" }));
+      if (B > b) out.push(ev("received", cid, B - b, "failed", { to_holder: holderId, note: note || "Found during count" }));
+      if (B < b) out.push(ev("written_off", cid, b - B, "failed", { from_holder: holderId, note: note || "Missing at count" }));
+      for (const e of out) { await enqueue("violet_events", e); made++; }
+    }
+    closeModal();
+    toast(made ? "Count saved" : "Count matched, nothing changed");
+    render();
+    sync();
+  }
+  async function serialTest(t) {
+    await enqueue("violet_events", {
+      id: uuid(), owner: uid(), happened_at: nowIso(), created_at: nowIso(), type: "checked", catalog_id: t.dataset.cat, serial: t.dataset.sn, qty: 1,
+      condition: t.dataset.to, from_holder: null, to_holder: t.dataset.holder || null, locker_id: "", site: "", symptom: "", cause: "", note: "",
+      vendor: "", customer: "", source: "count", extracted: { from_condition: t.dataset.to === "good" ? "failed" : "good" }, photos: [],
+    });
+    toast(t.dataset.to === "good" ? "Marked working" : "Marked not working");
+    render();
+    sync();
+  }
+
   function exportStock() {
     const d = derive();
-    const out = [["location", "location kind", "item", "part number", "kind", "vendor", "customer", "serial", "quantity", "unit", "added to system"]];
+    const out = [["location", "location kind", "item", "part number", "kind", "belongs to", "condition", "vendor", "customer", "serial", "quantity", "unit", "added to system"]];
     for (const h of holders())
       for (const it of d.byHolder.get(h.id) || []) {
         const c = catalogById(it.catalog_id) || {};
-        out.push([h.name, LOC_KINDS[h.kind] || h.kind, c.name, c.part_number, ITEM_KINDS[c.kind] || c.kind, c.vendor, c.customer || "", it.serial || "", it.qty, c.unit, c.created_at]);
+        out.push([h.name, LOC_KINDS[h.kind] || h.kind, c.name, c.part_number, ITEM_KINDS[c.kind] || c.kind, c.company ? "company" : "mine", it.cond === "bad" ? "not working" : "working", c.vendor, c.customer || "", it.serial || "", it.qty, c.unit, c.created_at]);
       }
     for (const s of d.lockers) {
       const c = catalogById(s.catalog_id) || {};
-      out.push([`locker ${s.locker_id} at ${s.site}`, "installed", c.name, c.part_number, ITEM_KINDS[c.kind] || c.kind, c.vendor, c.customer || "", s.serial, 1, c.unit, c.created_at]);
+      out.push([`locker ${s.locker_id} at ${s.site}`, "installed", c.name, c.part_number, ITEM_KINDS[c.kind] || c.kind, c.company ? "company" : "mine", "installed", c.vendor, c.customer || "", s.serial, 1, c.unit, c.created_at]);
     }
     download(`field-twin-violet-stock-${new Date().toISOString().slice(0, 10)}.csv`, csv(out));
   }
@@ -1684,6 +1805,11 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       case "item-back": S.itemId = ""; return render();
       case "clear-loc": S.itemLoc = ""; return render();
       case "edit-item": return editItemForm(t.dataset.cat);
+      case "count-pick": return countPick();
+      case "count-loc": return countForm(t.dataset.holder);
+      case "count-one": return countForm(t.dataset.holder, t.dataset.cat);
+      case "serial-test": return serialTest(t);
+      case "own-filter": S.itemCompany = t.dataset.own || ""; return render();
       case "log-back": S.log = null; S.tab = S.itemId ? "items" : "home"; return render();
       case "pick-open": S.log.picking = true; return render();
       case "pick-close": S.log.picking = false; return render();
@@ -1880,6 +2006,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       toast("Location added");
       render();
       sync();
+    } else if (f.id === "countForm") {
+      return saveCount(f);
     } else if (f.id === "itemForm") {
       const c = catalogById(f.dataset.cat);
       if (!c) return closeModal();
@@ -1890,6 +2018,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       await enqueue("violet_catalog", {
         ...clean(c), name, part_number: pn, kind: f.kind.value, manufacturer: f.manufacturer.value.trim(), model: f.model.value.trim(),
         vendor: f.vendor.value.trim(), customer: f.customer.value.trim(), unit: f.unit.value.trim() || "each", min_qty: Number.isFinite(min) && min > 0 ? min : 0,
+        company: !!f.company.checked,
       });
       closeModal();
       toast("Saved");
