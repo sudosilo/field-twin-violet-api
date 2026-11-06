@@ -704,7 +704,13 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     if (S.itemCompany === "mine") list = list.filter((c) => !c.company);
     if (S.itemCompany === "bad") list = list.filter((c) => notWorking(d, c.id) > 1e-9);
     if (S.itemLoc) list = list.filter((c) => (d.byCatalog.get(c.id) || []).some((it) => it.holder === S.itemLoc));
-    if (q) list = list.filter((c) => [c.name, c.part_number, c.model, c.manufacturer, c.vendor, c.customer].some((v) => norm(v).includes(q)) || [...d.serials.values()].some((s) => s.catalog_id === c.id && norm(s.serial).includes(q)));
+    if (q) {
+      const ws = q.split(/\s+/).filter(Boolean);
+      list = list.filter((c) => {
+        const hay = norm([c.name, c.part_number, c.model, c.manufacturer, c.vendor, c.customer].join(" "));
+        return ws.every((w) => hay.includes(w)) || [...d.serials.values()].some((st) => st.catalog_id === c.id && norm(st.serial).includes(q));
+      });
+    }
     list.sort((a, b) => partLabel(a).localeCompare(partLabel(b)));
     const kindChips = [["", "All"], ...Object.entries(ITEM_KINDS).map(([k, v]) => [k, v + "s"])]
       .map(([k, v]) => `<button class="btn small ${S.itemKind === k ? "on" : ""}" data-itemkind="${k}">${esc(v)}</button>`)
@@ -735,7 +741,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         </div>`;
       })
       .join("");
-    return `${locChip}
+    const listPns = new Set(catalog().map((c) => norm(c.part_number)));
+    const missing = NV11_PARTS.filter((p) => !listPns.has(norm(p.pn))).length;
+    const listCard = missing ? `<div class="card"><b>Company parts list</b><p class="muted">${missing} parts from the NV11 warehouse list are not in your items yet.</p><button class="btn primary wide" data-act="load-nv11">Add them to my items</button></div>` : "";
+    return `${listCard}${locChip}
       <div class="chips">${kindChips}</div>
       <div class="chips">${ownChips}</div>
       ${vendorSel}
@@ -1199,18 +1208,40 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     return row;
   }
 
+  // The parts list for Add stuff and the other actions: every item you have, plus every part on the company list
+  // even before it is in your stock. Filter by kind and by customer, and search any word of the name or either number.
+  function pickerPool() {
+    const have = catalog();
+    const pns = new Set(have.map((c) => norm(c.part_number)).filter(Boolean));
+    const fromList = NV11_PARTS.filter((p) => !pns.has(norm(p.pn))).map((p) => ({
+      id: "nv11:" + p.pn, kind: "part", name: p.name, part_number: p.pn, model: p.old || "", manufacturer: "", vendor: "", customer: "Amazon", company: true, _list: true,
+    }));
+    return have.concat(fromList);
+  }
   function renderPicker() {
     const L = S.log;
-    const q = norm(L.pickQ);
+    const words = norm(L.pickQ).split(/\s+/).filter(Boolean);
     const d = derive();
-    const list = catalog()
-      .filter((c) => !q || [c.name, c.part_number, c.model, c.vendor].some((v) => norm(v).includes(q)))
-      .sort((a, b) => partLabel(a).localeCompare(partLabel(b)))
-      .slice(0, 40);
+    const pool = pickerPool();
+    const kind = L.pickKind || "";
+    const cust = L.pickCust || "";
+    const custs = [...new Set(pool.map((c) => c.customer).filter(Boolean))].sort();
+    const list = pool
+      .filter((c) => !kind || c.kind === kind)
+      .filter((c) => !cust || (c.customer || "") === cust)
+      .filter((c) => { const hay = norm([c.name, c.part_number, c.model, c.manufacturer, c.vendor, c.customer].join(" ")); return words.every((w) => hay.includes(w)); })
+      .sort((a, b) => (b.company ? 1 : 0) - (a.company ? 1 : 0) || partLabel(a).localeCompare(partLabel(b)));
+    const kindChips = [["", "All"], ["part", "Parts"], ["tool", "Tools"], ["consumable", "Consumables"]]
+      .map(([k, v]) => `<button class="btn small ${kind === k ? "on" : ""}" data-act="pick-kind" data-k="${k}">${v}</button>`).join("");
+    const custChips = custs.length ? [["", "Every customer"], ...custs.map((c) => [c, c])]
+      .map(([k, v]) => `<button class="btn small ${cust === k ? "on" : ""}" data-act="pick-cust" data-k="${esc(k)}">${esc(v)}</button>`).join("") : "";
     return `<div class="card">
-      <h3>Pick from your items</h3>
-      <input id="pickSearch" value="${esc(L.pickQ)}" placeholder="Search name or part number">
-      <div class="list">${list.map((c) => `<div class="tap row item" data-pick="${c.id}"><div class="thumbcell">${c.ref_photo ? `<img class="thumb" data-photo="${esc(c.ref_photo)}" alt="">` : '<div class="thumb empty">No photo</div>'}</div><div><b>${esc(partLabel(c))}</b><br><span class="muted">${fmtNum(onHand(d, c.id))} on hand</span></div></div>`).join("") || '<div class="muted">No items yet. Use Take photo or Type it in.</div>'}</div>
+      <h3>Pick from the parts list</h3>
+      <div class="chips">${kindChips}</div>
+      ${custChips ? `<div class="chips">${custChips}</div>` : ""}
+      <input id="pickSearch" value="${esc(L.pickQ)}" placeholder="Search, like LCD, door lock, or a part number">
+      <p class="muted">${list.length} match${list.length === 1 ? "" : "es"}</p>
+      <div class="list">${list.slice(0, 80).map((c) => `<div class="tap row item" data-pick="${esc(c.id)}"><div class="thumbcell">${c.ref_photo ? `<img class="thumb" data-photo="${esc(c.ref_photo)}" alt="">` : '<div class="thumb empty">No photo</div>'}</div><div><b>${esc(partLabel(c))}</b>${c.company ? ' <span class="pill co">Company</span>' : ""}${c.customer ? ' <span class="pill">' + esc(c.customer) + "</span>" : ""}<br><span class="muted">${c._list ? "On the company list, none in stock yet" : fmtNum(onHand(d, c.id)) + " working on hand"}${c.model ? " · " + esc(c.model) : ""} · ${esc(ITEM_KINDS[c.kind] || c.kind)}</span></div></div>`).join("") || '<div class="muted">Nothing matches. Try fewer words, or use Type it in.</div>'}</div>
       <button class="btn wide" data-act="pick-close">Close list</button>
     </div>`;
   }
@@ -1235,7 +1266,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       <div class="card">
         <div class="pickrow">
           <label class="btn primary">Take photo<input id="photoInput" type="file" accept="image/*" capture="environment" hidden></label>
-          <button class="btn" data-act="pick-open">Pick from my items</button>
+          <button class="btn" data-act="pick-open">Pick from parts list</button>
           <button class="btn" data-act="add-item">Type it in</button>
         </div>
         <p class="muted">${apiReady ? "A photo of a label, box, packing slip, or the part itself fills in the details for you." : "Barcodes read from photos right on the phone. Label reading turns on when you are signed in, or in demo mode once a token is set under Setup."}</p>
@@ -1901,7 +1932,17 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       return render();
     }
     if (t.dataset.pick) {
-      const c = catalogById(t.dataset.pick);
+      let c = catalogById(t.dataset.pick);
+      if (!c && t.dataset.pick.startsWith("nv11:")) {
+        // a company list part picked before it was in stock: add it as an item now
+        const p = NV11_PARTS.find((x) => "nv11:" + x.pn === t.dataset.pick);
+        if (p) {
+          c = { id: uuid(), owner: uid(), kind: "part", name: p.name, part_number: p.pn, manufacturer: "", model: p.old || "", unit: "each",
+            vendor: "", customer: "Amazon", min_qty: 0, ref_photo: null, created_at: nowIso(), company: true };
+          await enqueue("violet_catalog", c);
+          c = catalogById(c.id) || c;
+        }
+      }
       if (c) {
         S.log.items = S.log.items.filter((it) => it.catalog_id || it.name || it.part_number);
         S.log.items.push(itemFromCatalog(c));
@@ -1955,6 +1996,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       case "log-back": S.log = null; S.tab = S.itemId ? "items" : "home"; return render();
       case "pick-open": S.log.picking = true; return render();
       case "pick-close": S.log.picking = false; return render();
+      case "pick-kind": S.log.pickKind = t.dataset.k || ""; return render();
+      case "pick-cust": S.log.pickCust = t.dataset.k || ""; return render();
       case "add-item": S.log.items.push(blankItem()); return render();
       case "remove-item": S.log.items.splice(Number(t.dataset.item), 1); return render();
       case "save-log": return saveLog();

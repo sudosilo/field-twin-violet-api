@@ -1,3 +1,5 @@
+2026-11-06, v2026.11.06d. Pick from parts list shows every part on the company list even before it is in stock, with Parts, Tools and Consumables filters, customer filters, and search on any words of the name or either number. Items shows a button to add the company list when it is missing.
+
 2026-11-06, v2026.11.06c. Orders carry the ticket they were ordered for, and orders with nothing arrived after ten days are flagged. A Tickets and attribution section on the Order tab ties arrivals to orders, lists arrivals with no order so each can be marked as sent without an order or linked, suggests possible swaps, and makes a ticket report spreadsheet.
 
 2026-11-06, v2026.11.06b. Setup can add the whole NV11 warehouse parts list as company parts for Amazon in one tap, with the old material number in Model so either number finds a part. Count stuff can show every item, including ones not in that location yet, so the first count fills in stock.
