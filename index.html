@@ -1157,7 +1157,20 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     return { ...blankItem(), catalog_id: c.id, name: c.name, kind: c.kind, part_number: c.part_number, manufacturer: c.manufacturer, model: c.model, unit: c.unit || "each" };
   }
 
+  // Default location: where new parts land and where used parts come from, unless you pick another. It is the
+  // one chosen in Setup, or your truck when nothing is chosen.
+  function defaultHolder() {
+    let pick = "";
+    try { pick = localStorage.getItem("violetDefaultLoc") || ""; } catch (e) {}
+    const hs = holders();
+    if (pick && hs.some((h) => h.id === pick)) return pick;
+    const truck = hs.find((h) => h.kind === "truck");
+    return truck ? truck.id : "";
+  }
   function newLog(type = "received") {
+    const def = defaultHolder();
+    const intoDefault = type === "received" || type === "pulled";
+    const fromDefault = type === "moved" || type === "installed" || type === "returned" || type === "written_off";
     return {
       type,
       photo: null,
@@ -1169,7 +1182,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       picking: false,
       pickQ: "",
       items: [],
-      f: { from_holder: "", to_holder: "", vendor: "", customer: "", locker_id: "", site: "", symptom: "", cause: "", condition: type === "pulled" || type === "returned" ? "failed" : "good", note: "", happened_at: localInput() },
+      f: { from_holder: fromDefault ? def : "", to_holder: intoDefault ? def : "", vendor: "", customer: "", locker_id: "", site: "", symptom: "", cause: "", condition: type === "pulled" || type === "returned" ? "failed" : "good", note: "", happened_at: localInput() },
     };
   }
 
@@ -1625,6 +1638,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       <h2>Export</h2>
       <div class="card row"><button class="btn" data-act="csv-stock">Stock CSV</button><button class="btn" data-act="csv-events">History CSV</button></div>
       <div class="card"><b>Company parts list</b><p class="muted">Adds every part on the NV11 warehouse list as a company part for Amazon, ready to count. Parts already in here are kept and only get marked as company parts.</p><button class="btn primary wide" data-act="load-nv11">Add the NV11 company parts list</button></div>
+      <h2>Default location</h2>
+      <div class="card"><p class="muted">New parts go here and used parts come from here unless you pick another location.</p>
+        <select id="defaultLoc">${holders().map((h) => `<option value="${h.id}" ${defaultHolder() === h.id ? "selected" : ""}>${esc(h.name)}</option>`).join("")}</select></div>
       <h2>Label reader</h2>
       <form id="settingsForm" class="card">
         <p class="muted">Signed in, the label reader works with nothing filled in here. These boxes are only for a different address or for demo mode.</p>
@@ -2131,6 +2147,11 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   });
 
   document.addEventListener("change", async (ev) => {
+    if (ev.target.id === "defaultLoc") {
+      try { localStorage.setItem("violetDefaultLoc", ev.target.value); } catch (e) {}
+      toast("Default location saved");
+      return;
+    }
     const t = ev.target;
     if (S.log && t.dataset.f && t.value === "@new") {
       const name = (window.prompt("Name of the new location, for example Storage unit or Second truck") || "").trim();
