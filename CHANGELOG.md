@@ -1,3 +1,5 @@
+2026-11-06, v2026.11.06c. Orders carry the ticket they were ordered for, and orders with nothing arrived after ten days are flagged. A Tickets and attribution section on the Order tab ties arrivals to orders, lists arrivals with no order so each can be marked as sent without an order or linked, suggests possible swaps, and makes a ticket report spreadsheet.
+
 2026-11-06, v2026.11.06b. Setup can add the whole NV11 warehouse parts list as company parts for Amazon in one tap, with the old material number in Model so either number finds a part. Count stuff can show every item, including ones not in that location yet, so the first count fills in stock.
 
 2026-11-06, v2026.11.06. Items can be marked as company parts. Every count is split into working and not working, with a filter for not working items. Count stuff walks a location and logs the difference between what the app expected and what is on the shelf. Parts tracked by serial get Works and Does not work buttons. Item pages show how many were used on jobs, and the stock spreadsheet lists who each part belongs to and whether it works.

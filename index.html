@@ -825,9 +825,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     return `${lines.length} line${lines.length === 1 ? "" : "s"}${done ? `, ${done} arrived` : ""}`;
   }
   function orderCard(o, open) {
-    const head = [o.vendor || "No vendor", o.order_number ? "order " + o.order_number : "", o.ordered_at ? fmtDay(o.ordered_at) : ""].filter(Boolean).join(" · ");
+    const head = [o.vendor || "No vendor", o.order_number ? "order " + o.order_number : "", o.ticket ? "ticket " + o.ticket : "", o.ordered_at ? fmtDay(o.ordered_at) : ""].filter(Boolean).join(" · ");
+    const flag = orderFlag(o);
     const lines = (o.lines || []).map((l) => `<div class="muted">${esc(l.name || l.part_number || "Unnamed")} · ${fmtNum(Number(l.qty) || 0)}${Number(l.received) ? ` · ${fmtNum(Number(l.received))} arrived` : ""}</div>`).join("");
-    return `<div class="card"><b>${esc(head)}</b>${o._pending ? ' <span class="pill">not uploaded yet</span>' : ""}${o.customer ? `<div class="muted">For ${esc(o.customer)}</div>` : ""}
+    return `<div class="card"><b>${esc(head)}</b>${flag ? ' <span class="pill bad">' + esc(flag) + '</span>' : ""}${o._pending ? ' <span class="pill">not uploaded yet</span>' : ""}${o.customer ? `<div class="muted">For ${esc(o.customer)}</div>` : ""}
       <div style="margin:6px 0">${lines || '<div class="muted">No items listed</div>'}</div>${o.note ? `<div class="muted">${esc(o.note)}</div>` : ""}
       ${(o.photos || []).length ? photoStrip(o.photos) : ""}
       ${open ? `<div class="row"><button class="btn small primary" data-act="order-arrive" data-order="${o.id}">It arrived, add to stock</button><button class="btn small" data-act="order-edit" data-order="${o.id}">Edit</button><button class="btn small" data-act="order-close" data-order="${o.id}">Cancel order</button></div>` : `<div class="muted">${o.status === "cancelled" ? "Cancelled" : "Arrived"}</div>`}</div>`;
@@ -857,6 +858,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         <label>Customer (who it is for, optional)</label><input data-of="customer" list="customerList" value="${esc(O.f.customer)}"><datalist id="customerList">${cs.map((v) => `<option value="${esc(v)}">`).join("")}</datalist>
         <div class="row"><div><label>Order number</label><input data-of="order_number" value="${esc(O.f.order_number)}"></div>
           <div><label>Ordered on</label><input data-of="ordered_at" type="date" value="${esc(O.f.ordered_at)}"></div></div>
+        <label>Ticket it was ordered for</label><input data-of="ticket" value="${esc(O.f.ticket || "")}" placeholder="Ticket number">
         <label>Note</label><input data-of="note" value="${esc(O.f.note)}">
       </div>
       <h3>What you ordered</h3>
@@ -895,7 +897,103 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       ${html}`;
     }
     const past = closed.length ? `<h2>Arrived and cancelled</h2>${closed.map((o) => orderCard(o, false)).join("")}` : "";
-    return top + low + past;
+    return top + low + attributionHtml() + past;
+  }
+
+  // ----- Ticket attribution -----
+  // Lines up orders with what arrived. An arrival belongs to the order it was logged from, or to the order you linked
+  // it to, or failing those to the latest order for the same part placed up to two months before it came. Orders
+  // with nothing arrived after ten days are flagged, arrivals with no order are listed so you can mark them as sent
+  // without an order or link them, and an arrival that came soon after an order for something else is offered as
+  // a possible swap.
+  const DAY = 864e5;
+  function orderLabel(o) {
+    if (!o) return "";
+    return [o.vendor || "", o.order_number ? "order " + o.order_number : "", o.ticket ? "ticket " + o.ticket : "", o.ordered_at ? fmtDay(o.ordered_at) : ""].filter(Boolean).join(" · ");
+  }
+  function lineFits(l, c) {
+    if (!c) return false;
+    const pn = norm(c.part_number), nm = norm(c.name), lpn = norm(l.part_number), lnm = norm(l.name);
+    return (pn && lpn && pn === lpn) || (nm && lnm && (nm === lnm || nm.includes(lnm) || lnm.includes(nm)));
+  }
+  function orderFlag(o) {
+    if (o.status !== "open") return "";
+    const age = (Date.now() - ms(o.ordered_at)) / DAY;
+    if (age < 10) return "";
+    const got = (o.lines || []).reduce((a, l) => a + (Number(l.received) || 0), 0);
+    return got > 0 ? "Part of it never came" : "Never received";
+  }
+  function arrivals() {
+    return events().filter((e) => e.type === "received" && e.source !== "count" && e.source !== "demo-count").sort(sortEvents).reverse();
+  }
+  function orderFor(e) {
+    if (e.unordered) return { o: null, how: "unordered" };
+    if (e.order_id) return { o: orders().find((o) => o.id === e.order_id) || null, how: "linked" };
+    const c = catalogById(e.catalog_id);
+    const t = ms(e.happened_at);
+    const fit = orders().filter((o) => { const ot = ms(o.ordered_at); return ot <= t + DAY && ot >= t - 60 * DAY && (o.lines || []).some((l) => lineFits(l, c)); })
+      .sort((a, b) => ms(b.ordered_at) - ms(a.ordered_at));
+    return { o: fit[0] || null, how: fit[0] ? "guessed" : "none" };
+  }
+  function swapGuesses(e) {
+    const c = catalogById(e.catalog_id);
+    const t = ms(e.happened_at);
+    return orders().filter((o) => {
+      const ot = ms(o.ordered_at);
+      if (ot > t + DAY || ot < t - 21 * DAY) return false;
+      if (e.vendor && o.vendor && norm(e.vendor) !== norm(o.vendor)) return false;
+      return (o.lines || []).some((l) => orderLineLeft(l) > 0 && !lineFits(l, c));
+    }).sort((a, b) => Math.abs(t - ms(a.ordered_at)) - Math.abs(t - ms(b.ordered_at))).slice(0, 2);
+  }
+  function attributionHtml() {
+    const arr = arrivals();
+    if (!arr.length && !orders().length) return "";
+    const flagged = orders().filter((o) => orderFlag(o));
+    const loose = arr.filter((e) => orderFor(e).how === "none");
+    const tied = arr.length - loose.length;
+    const looseHtml = loose.slice(0, 40).map((e) => {
+      const c = catalogById(e.catalog_id);
+      const guesses = swapGuesses(e);
+      return `<div class="card"><b>${esc(partLabel(c))}</b> <span class="muted">${fmtNum(Number(e.qty) || 1)} · came ${esc(fmtDay(e.happened_at))}${e.vendor ? " · " + esc(e.vendor) : ""}</span>
+        ${guesses.map((o) => `<div class="muted" style="margin-top:6px">Maybe this came instead of: ${esc(orderLabel(o))} (${esc((o.lines || []).filter((l) => orderLineLeft(l) > 0).map((l) => l.name || l.part_number).join(", "))})</div>
+          <button class="btn small" data-act="attr-pick" data-ev="${e.id}" data-order="${o.id}">Yes, it came for that order</button>`).join("")}
+        <div class="row" style="margin-top:6px"><button class="btn small" data-act="attr-auto" data-ev="${e.id}">Sent without an order</button><button class="btn small primary" data-act="attr-link" data-ev="${e.id}">Link to an order</button></div></div>`;
+    }).join("");
+    return `<h2>Tickets and attribution</h2>
+      <div class="tiles"><div class="tile"><span class="muted">Arrivals tied to an order</span><b>${tied}</b>of ${arr.length}</div>
+        <div class="tile"><span class="muted">Orders flagged</span><b>${flagged.length}</b>never fully came</div></div>
+      ${flagged.length ? `<h3>Ordered but not received</h3>${flagged.map((o) => orderCard(o, true)).join("")}` : ""}
+      ${loose.length ? `<h3>Came with no order found</h3><p class="muted">Each of these arrived without a matching order in the two months before. Mark it as sent without an order, link it to the order it filled, or accept a suggested swap.</p>${looseHtml}` : ""}
+      <button class="btn wide" data-act="attr-report">Ticket report spreadsheet</button>`;
+  }
+  async function setAttribution(evId, patch) {
+    const e = events().find((x) => x.id === evId);
+    if (!e) return;
+    await enqueue("violet_events", { ...clean(e), ...patch });
+    closeModal();
+    toast(patch.unordered ? "Marked as sent without an order" : "Linked to the order");
+    render();
+    sync();
+  }
+  function attrLinkPicker(evId) {
+    const e = events().find((x) => x.id === evId);
+    if (!e) return;
+    const t = ms(e.happened_at);
+    const list = orders().slice().sort((a, b) => Math.abs(t - ms(a.ordered_at)) - Math.abs(t - ms(b.ordered_at))).slice(0, 30);
+    openModal(`<h2>Which order did it fill?</h2><p class="muted">Closest order dates first.</p><div class="card list">${list.map((o) => `<div class="tap" data-act="attr-pick" data-ev="${evId}" data-order="${o.id}"><b>${esc(orderLabel(o))}</b><br><span class="muted">${esc((o.lines || []).map((l) => l.name || l.part_number).join(", "))}</span></div>`).join("") || '<div class="muted">No orders saved yet. Add the order under Order first.</div>'}</div>`);
+  }
+  function attrReport() {
+    const out = [["arrived", "item", "part number", "quantity", "vendor", "ticket", "order", "ordered on", "days from order to arrival", "how it was tied"]];
+    for (const e of arrivals()) {
+      const c = catalogById(e.catalog_id) || {};
+      const r = orderFor(e);
+      const how = { linked: "linked", guessed: "matched by part and date", unordered: "sent without an order", none: "no order found" }[r.how];
+      out.push([e.happened_at, c.name, c.part_number, e.qty, e.vendor, e.ticket || (r.o && r.o.ticket) || "", r.o ? r.o.order_number : "", r.o ? r.o.ordered_at : "", r.o ? Math.round((ms(e.happened_at) - ms(r.o.ordered_at)) / DAY) : "", how]);
+    }
+    for (const o of orders().filter((o) => orderFlag(o)))
+      for (const l of o.lines || []) if (orderLineLeft(l) > 0)
+        out.push(["never received", l.name, l.part_number, orderLineLeft(l), o.vendor, o.ticket || "", o.order_number, o.ordered_at, "", "ordered, not received"]);
+    download(`field-twin-violet-tickets-${new Date().toISOString().slice(0, 10)}.csv`, csv(out));
   }
 
   function blankOrderLine() {
@@ -904,7 +1002,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   function openOrderForm(o) {
     S.orderForm = {
       id: o ? o.id : "", photo: null, extracted: null, status: "", error: "", busy: false,
-      f: { vendor: o ? o.vendor || "" : "", customer: o ? o.customer || "" : "", order_number: o ? o.order_number || "" : "", ordered_at: o && o.ordered_at ? String(o.ordered_at).slice(0, 10) : nowIso().slice(0, 10), note: o ? o.note || "" : "" },
+      f: { vendor: o ? o.vendor || "" : "", customer: o ? o.customer || "" : "", order_number: o ? o.order_number || "" : "", ticket: o ? o.ticket || "" : "", ordered_at: o && o.ordered_at ? String(o.ordered_at).slice(0, 10) : nowIso().slice(0, 10), note: o ? o.note || "" : "" },
       lines: o ? (o.lines || []).map((l) => ({ ...blankOrderLine(), ...l })) : [blankOrderLine()],
       photos: o ? o.photos || [] : [],
     };
@@ -969,6 +1067,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         id: O.id || uuid(), owner, created_at: prev ? prev.created_at : nowIso(),
         ordered_at: O.f.ordered_at ? new Date(O.f.ordered_at + "T12:00:00").toISOString() : nowIso(),
         vendor: O.f.vendor.trim(), customer: O.f.customer.trim(), order_number: O.f.order_number.trim(), note: O.f.note.trim(),
+        ...((O.f.ticket || "").trim() || (prev && prev.ticket) ? { ticket: (O.f.ticket || "").trim() } : {}),
         status: prev ? prev.status : "open", lines, photos: [...(O.photos || []), ...(photoPath ? [photoPath] : [])],
         source: O.photo ? "photo" : "typed",
       };
@@ -1362,6 +1461,11 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
           extracted: L.extracted ? { source: L.extracted.source, shipment: L.extracted.shipment, item: { ...it, include: undefined } } : null,
           photos: photoPath ? [photoPath] : [],
         };
+        if (L.type === "received" && L.orderId) {
+          const fromOrder = orders().find((o) => o.id === L.orderId);
+          e.order_id = L.orderId;
+          if (fromOrder && fromOrder.ticket) e.ticket = fromOrder.ticket;
+        }
         await enqueue("violet_events", e, takePhoto());
       }
       if (L.type === "received") await applyToOrders(items, L.orderId || "", vendor);
@@ -1524,6 +1628,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       ["When it happened", fmtDate(e.happened_at)], ["Logged", fmtDate(e.created_at)], ["From", holderName(e.from_holder)], ["To", holderName(e.to_holder)],
       ["Vendor", e.vendor], ["Customer", e.customer], ["Locker", e.locker_id], ["Site", e.site],
       ["Condition", CONDITIONS[e.condition] || e.condition], ["Symptom", e.symptom], ["Cause", e.cause], ["Note", e.note], ["Entered by", e.source],
+      ["Ticket", e.ticket], ["Order", e.order_id ? orderLabel(orders().find((o) => o.id === e.order_id)) : ""], ["Attribution", e.unordered ? "Sent without an order" : ""],
     ].filter(([, v]) => v);
     openModal(`<h2>${esc(TYPES[e.type] || e.type)}</h2><table>${rowsHtml.map(([k, v]) => `<tr><td class="muted">${k}</td><td>${esc(v)}</td></tr>`).join("")}</table>
       <div class="chips">${c ? `<button class="btn small" data-catalog="${c.id}">Open item</button>` : ""}${e.serial ? `<button class="btn small" data-serial="${esc(e.serial)}">Full history of this serial</button>` : ""}</div>${photoStrip(e.photos)}`);
@@ -1838,6 +1943,10 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       case "edit-item": return editItemForm(t.dataset.cat);
       case "count-pick": return countPick();
       case "load-nv11": return loadNv11();
+      case "attr-auto": return setAttribution(t.dataset.ev, { unordered: true });
+      case "attr-link": return attrLinkPicker(t.dataset.ev);
+      case "attr-pick": { const o = orders().find((x) => x.id === t.dataset.order); return setAttribution(t.dataset.ev, { order_id: t.dataset.order, unordered: false, ...(o && o.ticket ? { ticket: o.ticket } : {}) }); }
+      case "attr-report": return attrReport();
       case "count-all": return countForm(t.dataset.holder, "", true);
       case "count-loc": return countForm(t.dataset.holder);
       case "count-one": return countForm(t.dataset.holder, t.dataset.cat);
