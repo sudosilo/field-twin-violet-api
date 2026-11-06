@@ -1405,12 +1405,33 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         const j = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(j.error || `label reader answered ${r.status}`);
         L.extracted = j.result;
-        const read = (j.result.items || []).map((it) => {
+        let read = (j.result.items || []).map((it) => {
           const base = { ...blankItem(), ...it, include: true };
           const c = findCatalog(base);
           return c ? { ...base, catalog_id: c.id } : base;
         });
+        // Check the photo against the parts library, your items plus the company list. A material number or old
+        // material number anywhere on the label is a sure match; otherwise the closest name counts as a guess.
+        const lib = await libraryMatch(j.result, L.barcodes);
+        if (lib) {
+          const one = { ...itemFromCatalog(lib.c), quantity: 1, include: true };
+          const firstRead = read[0] || {};
+          if (firstRead.serial) one.serial = firstRead.serial;
+          read = [one];
+          if (lib.c.customer && !L.f.customer) L.f.customer = lib.c.customer;
+          if (lib.c.vendor && !L.f.vendor) L.f.vendor = lib.c.vendor;
+        }
         L.items = L.items.filter((it) => it.catalog_id || it.name || it.part_number).concat(read);
+        if (lib && lib.sure && L.type === "received" && L.f.to_holder && L.items.length === 1) {
+          L.status = "";
+          render();
+          toast(`Matched ${partLabel(lib.c)}, added 1 to ${holderName(L.f.to_holder)}`);
+          return saveLog();
+        }
+        if (lib) {
+          L.status = `Looks like ${partLabel(lib.c)} from the parts list. Check it and tap Save.`;
+          return render();
+        }
         if (j.result.shipment && j.result.shipment.vendor && !L.f.vendor) L.f.vendor = j.result.shipment.vendor;
         L.status = read.length ? `Read ${read.length} item${read.length > 1 ? "s" : ""}${j.cached ? " (saved reading)" : ""}` : "Nothing readable on the label. Fill it in by hand.";
       } else {
@@ -1427,6 +1448,39 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       if (!L.items.length) L.items.push(blankItem());
     }
     render();
+  }
+
+  async function libraryMatch(result, barcodes) {
+    const pool = pickerPool();
+    const lc = (v) => String(v || "").toLowerCase();
+    const hay = lc(JSON.stringify(result || {}) + " " + (barcodes || []).join(" "));
+    const flat = hay.replace(/[^a-z0-9]/g, "");
+    let hit = null;
+    for (const c of pool) {
+      const nums = [c.part_number, c.model].map((v) => lc(v).replace(/[^a-z0-9]/g, "")).filter((v) => v.length >= 7);
+      if (nums.some((v) => flat.includes(v))) { hit = c; break; }
+    }
+    let sure = !!hit;
+    if (!hit) {
+      const words = new Set(hay.split(/[^a-z0-9.]+/).filter((w) => w.length >= 3));
+      let best = 0;
+      for (const c of pool) {
+        const ws = lc(c.name).split(/[^a-z0-9.]+/).filter((w) => w.length >= 3 && !["amz", "amazon", "for", "the", "and", "with"].includes(w));
+        if (ws.length < 2) continue;
+        const score = ws.filter((w) => words.has(w)).length / ws.length;
+        if (score > best) { best = score; hit = c; }
+      }
+      if (best < 0.6) hit = null;
+    }
+    if (!hit) return null;
+    if (hit._list) {
+      // a company list part seen for the first time: add it to your items
+      const row = { id: uuid(), owner: uid(), kind: "part", name: hit.name, part_number: hit.part_number, manufacturer: "", model: hit.model || "", unit: "each",
+        vendor: "", customer: hit.customer || "Amazon", min_qty: 0, ref_photo: null, created_at: nowIso(), company: true };
+      await enqueue("violet_catalog", row);
+      hit = catalogById(row.id) || row;
+    }
+    return { c: hit, sure };
   }
 
   function findCatalog(it) {

@@ -1,3 +1,5 @@
+2026-11-06, v2026.11.06f. A label photo in Add stuff is checked against the parts library, your items plus the company list. When a material number or old material number is on the label, one of that part is added to your default location right away. When only the name looks like a library part, the form is filled in with it for you to check and save.
+
 2026-11-06, v2026.11.06e. New parts go into your truck and used parts come out of it by default. Setup has a Default location choice to change it.
 
 2026-11-06, v2026.11.06d. Pick from parts list shows every part on the company list even before it is in stock, with Parts, Tools and Consumables filters, customer filters, and search on any words of the name or either number. Items shows a button to add the company list when it is missing.
