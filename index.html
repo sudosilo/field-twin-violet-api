@@ -441,6 +441,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const o = await fetchAll("violet_orders").catch(() => S.server.violet_orders || []);
     S.server = { violet_holders: h, violet_catalog: c, violet_events: e, violet_orders: o };
     S.lastSync = nowIso();
+    claudeSnapshot();
     await idb.set("data:" + S.user.id, { server: S.server, lastSync: S.lastSync });
   }
 
@@ -1701,6 +1702,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       </div>
       <h2>Export</h2>
       <div class="card row"><button class="btn" data-act="csv-stock">Stock CSV</button><button class="btn" data-act="csv-events">History CSV</button></div>
+      <div class="card"><button class="btn primary wide" data-act="check-link">Copy check link for Claude</button><p class="muted">Lets Claude read your items and history to check entries. The copy updates every time the app uploads.</p></div>
       <div class="card"><b>Company parts list</b><p class="muted">Adds every part on the NV11 warehouse list as a company part for Amazon, ready to count. Parts already in here are kept and only get marked as company parts.</p><button class="btn primary wide" data-act="load-nv11">Add the NV11 company parts list</button><button class="btn wide" style="margin-top:8px" data-act="export-nv11">NV11 count sheet</button><p class="muted">Saves the NV11 list in the warehouse's own columns with Actual Count filled in from your stock, plus working and not working.</p></div>
       <h2>Default location</h2>
       <div class="card"><p class="muted">New parts go here and used parts come from here unless you pick another location.</p>
@@ -1830,6 +1832,32 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     toast("Undone");
     render();
     sync();
+  }
+
+  // Check copy for Claude: after every upload, a read-only copy of your items, locations and recent history is
+  // saved as one file in your own photo storage. The link from Copy check link lets Claude read that file, and
+  // nothing else, so it can check each entry as you make it. The link keeps working as the file is replaced.
+  let snapBusy = false;
+  async function claudeSnapshot() {
+    if (S.demo || !S.user || snapBusy) return;
+    snapBusy = true;
+    try {
+      const snap = { saved_at: nowIso(), holders: holders(), catalog: catalog().map((c) => { const x = clean(c); delete x.ref_photo; return x; }),
+        events: events().slice().sort(sortEvents).reverse().slice(0, 800).map((e) => { const x = clean(e); delete x.photos; delete x.extracted; return x; }) };
+      const blob = new Blob([JSON.stringify(snap)], { type: "application/json" });
+      const path = S.user.id + "/claude-check-v1.json";
+      let r = await sb.storage.from(BUCKET).upload(path, blob, { upsert: true, contentType: "application/json" });
+      if (r.error) r = await sb.storage.from(BUCKET).upload(path, new Blob([JSON.stringify(snap)], { type: "image/jpeg" }), { upsert: true, contentType: "image/jpeg" });
+    } catch (e) {} finally { snapBusy = false; }
+  }
+  async function copyCheckLink() {
+    if (!S.user) return toast("Sign in first");
+    await claudeSnapshot();
+    const r = await sb.storage.from(BUCKET).createSignedUrl(S.user.id + "/claude-check-v1.json", 60 * 60 * 24 * 365);
+    if (r.error || !r.data) return toast("Could not make the link: " + (r.error ? r.error.message : "no link"));
+    const url = r.data.signedUrl;
+    try { await navigator.clipboard.writeText(url); toast("Check link copied, paste it to Claude"); }
+    catch (e) { openModal(`<h2>Check link</h2><p class="muted">Copy this and paste it to Claude.</p><textarea rows="6" readonly>${esc(url)}</textarea>`); }
   }
 
   // ----- Count stuff -----
@@ -2096,6 +2124,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       case "edit-item": return editItemForm(t.dataset.cat);
       case "count-pick": return countPick();
       case "load-nv11": return loadNv11();
+      case "check-link": return copyCheckLink();
       case "undo-event": return undoEvent(t.dataset.ev);
       case "export-nv11": return exportNv11();
       case "attr-auto": return setAttribution(t.dataset.ev, { unordered: true });
