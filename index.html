@@ -1462,11 +1462,13 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const pool = pickerPool();
     const lc = (v) => String(v || "").toLowerCase();
     const hay = lc(JSON.stringify(result || {}) + " " + (barcodes || []).join(" "));
-    const flat = hay.replace(/[^a-z0-9]/g, "");
+    // Numbers count only as whole numbers on the label, never as a piece of a longer number or of two numbers run
+    // together, so a stray string of digits cannot pick the wrong part.
+    const tokens = new Set(hay.split(/[^a-z0-9]+/).filter((t) => t.length >= 6));
     let hit = null;
     for (const c of pool) {
       const nums = [c.part_number, c.model].map((v) => lc(v).replace(/[^a-z0-9]/g, "")).filter((v) => v.length >= 7);
-      if (nums.some((v) => flat.includes(v))) { hit = c; break; }
+      if (nums.some((v) => tokens.has(v))) { hit = c; break; }
     }
     let sure = !!hit;
     if (!hit) {
@@ -1739,7 +1741,9 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       ["Condition", CONDITIONS[e.condition] || e.condition], ["Symptom", e.symptom], ["Cause", e.cause], ["Note", e.note], ["Entered by", e.source],
       ["Ticket", e.ticket], ["Order", e.order_id ? orderLabel(orders().find((o) => o.id === e.order_id)) : ""], ["Attribution", e.unordered ? "Sent without an order" : ""],
     ].filter(([, v]) => v);
+    const canUndo = !e.serial && e.source !== "undo" && ["received", "written_off", "installed", "moved", "returned", "pulled"].includes(e.type) && !events().some((x) => x.extracted && x.extracted.undo_of === e.id);
     openModal(`<h2>${esc(TYPES[e.type] || e.type)}</h2><table>${rowsHtml.map(([k, v]) => `<tr><td class="muted">${k}</td><td>${esc(v)}</td></tr>`).join("")}</table>
+      ${canUndo ? `<button class="btn wide" data-act="undo-event" data-ev="${e.id}">Undo this, it was wrong</button>` : ""}
       <div class="chips">${c ? `<button class="btn small" data-catalog="${c.id}">Open item</button>` : ""}${e.serial ? `<button class="btn small" data-serial="${esc(e.serial)}">Full history of this serial</button>` : ""}</div>${photoStrip(e.photos)}`);
   }
 
@@ -1810,6 +1814,22 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       out.push(["5104", "NV11", p.pn, p.name, p.old || "", fmtNum(good + bad), fmtNum(good), fmtNum(bad)]);
     }
     download(`temple-nv11-count-${new Date().toISOString().slice(0, 10)}.csv`, csv(out));
+  }
+
+  // Undo: logs the exact opposite of a wrong entry, so the counts go back and the history shows both.
+  async function undoEvent(id) {
+    const e = events().find((x) => x.id === id);
+    if (!e) return;
+    const back = { ...clean(e), id: uuid(), happened_at: nowIso(), created_at: nowIso(), photos: [], source: "undo", note: "Undo of a wrong entry", extracted: { undo_of: e.id } };
+    delete back.order_id; delete back.ticket; delete back.unordered;
+    if (e.type === "received" || e.type === "pulled") { back.type = "written_off"; back.from_holder = e.to_holder; back.to_holder = null; }
+    else if (e.type === "written_off" || e.type === "installed" || e.type === "returned") { back.type = "received"; back.to_holder = e.from_holder; back.from_holder = null; back.locker_id = ""; back.site = ""; }
+    else if (e.type === "moved") { back.from_holder = e.to_holder; back.to_holder = e.from_holder; }
+    await enqueue("violet_events", back);
+    closeModal();
+    toast("Undone");
+    render();
+    sync();
   }
 
   // ----- Count stuff -----
@@ -2076,6 +2096,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       case "edit-item": return editItemForm(t.dataset.cat);
       case "count-pick": return countPick();
       case "load-nv11": return loadNv11();
+      case "undo-event": return undoEvent(t.dataset.ev);
       case "export-nv11": return exportNv11();
       case "attr-auto": return setAttribution(t.dataset.ev, { unordered: true });
       case "attr-link": return attrLinkPicker(t.dataset.ev);
