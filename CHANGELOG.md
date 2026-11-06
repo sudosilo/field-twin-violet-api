@@ -1,3 +1,5 @@
+2026-11-06, v2026.11.06g. Setup has an NV11 count sheet that saves the warehouse list in its own columns with Actual Count filled in from your stock, plus working and not working. Company list descriptions now match the warehouse spreadsheet word for word.
+
 2026-11-06, v2026.11.06f. A label photo in Add stuff is checked against the parts library, your items plus the company list. When a material number or old material number is on the label, one of that part is added to your default location right away. When only the name looks like a library part, the form is filled in with it for you to check and save.
 
 2026-11-06, v2026.11.06e. New parts go into your truck and used parts come out of it by default. Setup has a Default location choice to change it.
