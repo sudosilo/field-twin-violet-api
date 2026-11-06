@@ -1,3 +1,5 @@
+2026-11-06, v2026.11.06i. One photo can hold several parts: each is matched against the parts library on its own, and when every one is a sure number match they are all added at once. Setup can import a count sheet in the warehouse layout, setting each part's count from Actual Count.
+
 2026-11-06, v2026.11.06h. Label numbers only match a part as a whole number, never as a piece of a longer number or two numbers run together, which had matched an eSIM to an occupancy sensor. History entries have Undo this, it was wrong, which logs the opposite entry so the counts go back.
 
 2026-11-06, v2026.11.06g. Setup has an NV11 count sheet that saves the warehouse list in its own columns with Actual Count filled in from your stock, plus working and not working. Company list descriptions now match the warehouse spreadsheet word for word.

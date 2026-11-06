@@ -1421,24 +1421,33 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         });
         // Check the photo against the parts library, your items plus the company list. A material number or old
         // material number anywhere on the label is a sure match; otherwise the closest name counts as a guess.
-        const lib = await libraryMatch(j.result, L.barcodes);
-        if (lib) {
-          const one = { ...itemFromCatalog(lib.c), quantity: 1, include: true };
-          const firstRead = read[0] || {};
-          if (firstRead.serial) one.serial = firstRead.serial;
-          read = [one];
-          if (lib.c.customer && !L.f.customer) L.f.customer = lib.c.customer;
-          if (lib.c.vendor && !L.f.vendor) L.f.vendor = lib.c.vendor;
+        // Every item in the photo is checked against the parts library on its own, so one photo can hold several
+        // parts. With a single item, the whole label counts toward its match.
+        const raw = read.length ? read : [{}];
+        const matched = [];
+        for (const it of raw) {
+          const src = raw.length === 1 ? { item: it, rest: j.result } : { item: it };
+          const lib = await libraryMatch(src, raw.length === 1 ? L.barcodes : []);
+          if (lib) {
+            const one = { ...itemFromCatalog(lib.c), quantity: Number(it.quantity) > 0 ? Number(it.quantity) : 1, include: true };
+            if (it.serial) one.serial = it.serial;
+            if (lib.c.customer && !L.f.customer) L.f.customer = lib.c.customer;
+            if (lib.c.vendor && !L.f.vendor) L.f.vendor = lib.c.vendor;
+            matched.push({ item: one, lib });
+          } else if (it.name || it.part_number) matched.push({ item: it, lib: null });
         }
+        read = matched.map((m) => m.item);
         L.items = L.items.filter((it) => it.catalog_id || it.name || it.part_number).concat(read);
-        if (lib && lib.sure && L.type === "received" && L.f.to_holder && L.items.length === 1) {
+        const allSure = matched.length > 0 && matched.every((m) => m.lib && m.lib.sure);
+        if (allSure && L.type === "received" && L.f.to_holder) {
           L.status = "";
           render();
-          toast(`Matched ${partLabel(lib.c)}, added 1 to ${holderName(L.f.to_holder)}`);
+          toast(`Added ${matched.map((m) => fmtNum(m.item.quantity) + " " + partLabel(m.lib.c)).join(", ")} to ${holderName(L.f.to_holder)}`);
           return saveLog();
         }
-        if (lib) {
-          L.status = `Looks like ${partLabel(lib.c)} from the parts list. Check it and tap Save.`;
+        if (matched.some((m) => m.lib)) {
+          const named = matched.filter((m) => m.lib).map((m) => partLabel(m.lib.c));
+          L.status = `Matched from the parts list: ${named.join(", ")}. Check ${matched.length > 1 ? "each one" : "it"} and tap Save.`;
           return render();
         }
         if (j.result.shipment && j.result.shipment.vendor && !L.f.vendor) L.f.vendor = j.result.shipment.vendor;
@@ -1703,7 +1712,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       <h2>Export</h2>
       <div class="card row"><button class="btn" data-act="csv-stock">Stock CSV</button><button class="btn" data-act="csv-events">History CSV</button></div>
       <div class="card"><button class="btn primary wide" data-act="check-link">Copy check link for Claude</button><p class="muted">Lets Claude read your items and history to check entries. The copy updates every time the app uploads.</p></div>
-      <div class="card"><b>Company parts list</b><p class="muted">Adds every part on the NV11 warehouse list as a company part for Amazon, ready to count. Parts already in here are kept and only get marked as company parts.</p><button class="btn primary wide" data-act="load-nv11">Add the NV11 company parts list</button><button class="btn wide" style="margin-top:8px" data-act="export-nv11">NV11 count sheet</button><p class="muted">Saves the NV11 list in the warehouse's own columns with Actual Count filled in from your stock, plus working and not working.</p></div>
+      <div class="card"><b>Company parts list</b><p class="muted">Adds every part on the NV11 warehouse list as a company part for Amazon, ready to count. Parts already in here are kept and only get marked as company parts.</p><button class="btn primary wide" data-act="load-nv11">Add the NV11 company parts list</button><button class="btn wide" style="margin-top:8px" data-act="export-nv11">NV11 count sheet</button><label class="btn wide" style="margin-top:8px;text-align:center">Import a count sheet<input id="countSheetInput" type="file" accept=".xlsx,.xls,.csv" hidden></label><p class="muted">Saves the NV11 list in the warehouse's own columns with Actual Count filled in from your stock, plus working and not working.</p></div>
       <h2>Default location</h2>
       <div class="card"><p class="muted">New parts go here and used parts come from here unless you pick another location.</p>
         <select id="defaultLoc">${holders().map((h) => `<option value="${h.id}" ${defaultHolder() === h.id ? "selected" : ""}>${esc(h.name)}</option>`).join("")}</select></div>
@@ -1858,6 +1867,54 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const url = r.data.signedUrl;
     try { await navigator.clipboard.writeText(url); toast("Check link copied, paste it to Claude"); }
     catch (e) { openModal(`<h2>Check link</h2><p class="muted">Copy this and paste it to Claude.</p><textarea rows="6" readonly>${esc(url)}</textarea>`); }
+  }
+
+  // Import a count sheet in the warehouse layout (the NV11 spreadsheet, as a spreadsheet file or CSV). Each row
+  // with a number in Actual Count sets that part's total, working, and the difference lands in your default
+  // location as found or missing, so the app matches the sheet. Rows with Actual Count left empty are skipped.
+  async function loadSheetLib() {
+    if (window.XLSX) return window.XLSX;
+    await new Promise((ok, bad) => { const sc = document.createElement("script"); sc.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"; sc.onload = ok; sc.onerror = () => bad(new Error("could not load the spreadsheet reader")); document.head.appendChild(sc); });
+    return window.XLSX;
+  }
+  async function importCountSheet(file) {
+    try {
+      const X = await loadSheetLib();
+      const wb = X.read(await file.arrayBuffer(), { type: "array" });
+      const rows = X.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: "" });
+      const head = (rows[0] || []).map((h) => String(h).trim().toLowerCase());
+      const iMat = head.indexOf("material"), iCount = head.indexOf("actual count"), iName = head.indexOf("material number"), iOld = head.indexOf("old material no.");
+      if (iMat < 0 || iCount < 0) return toast("That sheet has no Material and Actual Count columns");
+      const holder = defaultHolder();
+      if (!holder) return toast("Add a location first");
+      const d = derive();
+      const owner = uid();
+      let set = 0;
+      for (const r of rows.slice(1)) {
+        const pn = String(r[iMat] === "" ? "" : typeof r[iMat] === "number" ? Math.round(r[iMat]) : r[iMat]).trim();
+        const cnt = r[iCount];
+        if (!pn || cnt === "" || cnt === null || !isFinite(Number(cnt))) continue;
+        let c = catalog().find((x) => norm(x.part_number) === norm(pn));
+        if (!c) {
+          const listed = NV11_PARTS.find((x) => x.pn === pn);
+          c = { id: uuid(), owner, kind: "part", name: (listed && listed.name) || String(r[iName] || pn), part_number: pn, manufacturer: "", model: (listed && listed.old) || String(r[iOld] || ""), unit: "each",
+            vendor: "", customer: "Amazon", min_qty: 0, ref_photo: null, created_at: nowIso(), company: true };
+          await enqueue("violet_catalog", c);
+        }
+        const total = (d.byCatalog.get(c.id) || []).filter((it) => it.cond !== "bad").reduce((a, it) => a + it.qty, 0);
+        const diff = Number(cnt) - total;
+        if (Math.abs(diff) < 1e-9) continue;
+        await enqueue("violet_events", {
+          id: uuid(), owner, happened_at: nowIso(), created_at: nowIso(), type: diff > 0 ? "received" : "written_off", catalog_id: c.id, serial: "", qty: Math.abs(diff), condition: "good",
+          from_holder: diff > 0 ? null : holder, to_holder: diff > 0 ? holder : null, locker_id: "", site: "", symptom: "", cause: "",
+          note: diff > 0 ? "Found during count sheet import" : "Missing at count sheet import", vendor: "", customer: c.customer || "Amazon", source: "count", extracted: null, photos: [],
+        });
+        set++;
+      }
+      toast(set ? `Count sheet imported, ${set} part${set === 1 ? "" : "s"} updated` : "Count sheet matched, nothing changed");
+      render();
+      sync();
+    } catch (e) { toast("Could not read that sheet: " + e.message); }
   }
 
   // ----- Count stuff -----
@@ -2274,6 +2331,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
   });
 
   document.addEventListener("change", async (ev) => {
+    if (ev.target.id === "countSheetInput" && ev.target.files[0]) { const f = ev.target.files[0]; ev.target.value = ""; return importCountSheet(f); }
     if (ev.target.id === "defaultLoc") {
       try { localStorage.setItem("violetDefaultLoc", ev.target.value); } catch (e) {}
       toast("Default location saved");
