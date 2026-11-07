@@ -1709,6 +1709,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         ${S.syncError ? `<p class="err">Last upload failed: ${esc(S.syncError)}</p>` : ""}
         <button class="btn" data-act="sync">Upload now</button>`}
       </div>
+      <h2>Weekly reports</h2>
+      <div class="card"><button class="btn primary wide" data-act="reports">Open weekly reports</button><p class="muted">A report of your stock, this week's entries and week over week trends is made for you every Friday morning.</p></div>
       <h2>Export</h2>
       <div class="card row"><button class="btn" data-act="csv-stock">Stock CSV</button><button class="btn" data-act="csv-events">History CSV</button></div>
       <div class="card"><button class="btn primary wide" data-act="check-link">Copy check link for Claude</button><p class="muted">Lets Claude read your items and history to check entries. The copy updates every time the app uploads.</p></div>
@@ -1859,6 +1861,29 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       if (r.error) r = await sb.storage.from(BUCKET).upload(path, new Blob([JSON.stringify(snap)], { type: "image/jpeg" }), { upsert: true, contentType: "image/jpeg" });
     } catch (e) {} finally { snapBusy = false; }
   }
+  // Weekly reports: GitHub builds one every Friday morning into your folder and lists it in violet_reports.
+  async function showReports() {
+    if (S.demo) return toast("Reports come from your account, leave demo data first");
+    if (!S.user) return toast("Sign in first");
+    openModal('<h2>Weekly reports</h2><p class="muted">Loading reports</p>');
+    const { data, error } = await sb.from("violet_reports").select("id, week_of, path, summary").order("week_of", { ascending: false }).limit(104);
+    if (error) return openModal(`<h2>Weekly reports</h2><p class="err">Could not load reports: ${esc(error.message)}</p>`);
+    if (!data || !data.length) return openModal('<h2>Weekly reports</h2><p class="muted">Your first report shows up here Friday morning.</p>');
+    S.reports = data;
+    openModal(`<h2>Weekly reports</h2><div class="card list">${data.map((r, i) => {
+      const a = (r.summary && r.summary.all) || {}, prev = data[i + 1] && data[i + 1].summary && data[i + 1].summary.all;
+      const ch = prev ? Number(a.units || 0) - Number(prev.units || 0) : null;
+      const chTxt = ch === null ? "" : ch === 0 ? " · no change" : ` · ${ch > 0 ? "up" : "down"} ${fmtNum(Math.abs(ch))}`;
+      return `<div class="tap" data-act="report-open" data-path="${esc(r.path)}"><b>Week ending ${esc(new Date(r.week_of + "T12:00:00").toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }))}</b> <span class="muted">${fmtNum(Number(a.units || 0))} on hand${chTxt} · ${fmtNum(Number((r.summary && r.summary.entries_week) || 0))} entries</span></div>`;
+    }).join("")}</div>`);
+  }
+  async function openReport(path) {
+    const w = window.open("", "_blank");
+    const r = await sb.storage.from(BUCKET).createSignedUrl(path, 3600);
+    if (r.error || !r.data) { if (w) w.close(); return toast("Could not open that report: " + (r.error ? r.error.message : "no link")); }
+    if (w) w.location = r.data.signedUrl; else location.href = r.data.signedUrl;
+  }
+
   async function copyCheckLink() {
     if (!S.user) return toast("Sign in first");
     await claudeSnapshot();
@@ -2182,6 +2207,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       case "count-pick": return countPick();
       case "load-nv11": return loadNv11();
       case "check-link": return copyCheckLink();
+      case "reports": return showReports();
+      case "report-open": return openReport(t.dataset.path);
       case "undo-event": return undoEvent(t.dataset.ev);
       case "export-nv11": return exportNv11();
       case "attr-auto": return setAttribution(t.dataset.ev, { unordered: true });

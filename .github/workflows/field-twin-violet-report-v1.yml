@@ -1,0 +1,22 @@
+name: Field Twin Violet weekly report
+
+# Every Friday morning, builds each person's inventory report from what is in Violet and saves it to their account,
+# where the app lists it under Reports. Run it by hand from the Actions tab any time.
+on:
+  schedule:
+    - cron: '47 14 * * 5'
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install reportlab==4.2.5
+      - name: Build and save reports
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: python field-twin-violet-reports/field-twin-violet-report-v1.py
