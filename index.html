@@ -103,13 +103,17 @@
   .ft-sites a{flex:1;display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;font-weight:800;letter-spacing:.3px;color:#5a6d85;text-decoration:none}
   .ft-sites a.on{color:#0b4ea2;box-shadow:inset 0 -4px 0 #0a1b2e}
   #vendorFilter, #customerFilter { margin-top: 8px; }
+  header { position: relative; padding-right: 54px !important; }
+  .info-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border-radius: 50%; border: 2px solid #0b4ea2; background: #fff; color: #0b4ea2; font: italic 800 17px Georgia, serif; cursor: pointer; padding: 0; }
+  .help h3 { color: #0b4ea2; margin: 14px 0 4px; font-size: 15px; }
+  .help p { margin: 0 0 6px; line-height: 1.45; }
 </style>
 </head>
 <body>
 <script>if (window.top !== window.self) document.documentElement.classList.add("framed");</script>
 <script src="field-twin-violet-v3-config.js"></script>
 <div class="top">
-<header><h1>Field Twin Violet</h1><span id="status"></span></header>
+<header><h1>Field Twin Violet</h1><span id="status"></span><button class="info-btn" data-act="help" aria-label="How Violet works">i</button></header>
 <nav class="ft-sites" aria-label="Field Twin apps"><a href="https://field-twin-teal.vercel.app/#map">Field map</a><a class="on" aria-current="page" href="https://field-twin-violet.vercel.app/">Inventory</a><a href="https://field-twin-glaucous.vercel.app/">Roads</a></nav>
 <nav id="nav" hidden>
   <button data-tab="home">Home</button>
@@ -1884,6 +1888,23 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     if (w) w.location = r.data.signedUrl; else location.href = r.data.signedUrl;
   }
 
+  // How Violet works: the info button at the top right.
+  function showHelp() {
+    const sec = (t, ...ps) => `<h3>${t}</h3>${ps.map((p) => `<p>${p}</p>`).join("")}`;
+    openModal(`<div class="help"><h2>How Violet works</h2>
+      ${sec("What it is", "Violet keeps track of every part, tool and consumable you have, where each one sits, and everything that happened to it. Nothing is ever typed over: every change is an entry in History, and the counts are worked out from those entries.")}
+      ${sec("Home", "The What happened buttons log what you did: Add stuff, Move stuff, Installed, Pulled bad part, Sent back, and Used up or tossed. Count stuff counts a location: pick it, type how many of each item work and how many do not, and Violet logs the difference so the counts match the shelf. The tiles show your items, what is running low, what is installed at lockers, and each location.")}
+      ${sec("Adding parts", "In any entry, pick items from the full list, which includes the NV11 company parts list. Filter it by kind, by customer such as Amazon, HP, Otto or hospital, or type words to search. New parts go to your default location, your truck, unless you pick another.", "Take a photo of a part label and the reader finds each part in the photo and matches it to the list by its part number. Several parts in one photo work. When every part in the photo is a sure match, they are all added in one go. When one is not sure, you pick from the closest guesses. If the reader cannot run, the message says why in plain words, such as being out of credit.")}
+      ${sec("Items", "Every item with its stock by location. Filter by kind, vendor, customer, company parts, your own, or not working, and search by name, part number or serial. Company parts are marked Company and carry the customer they belong to. Each item has its own page with its photos, where it is, and its history.")}
+      ${sec("Working and not working", "Every count is split into working and not working. Parts tracked by serial number are marked one at a time with Works or Does not work on the item page. Pulled bad part logs a failed part with its symptom and cause, and the Failures tab adds those up by part, site, symptom and cause.")}
+      ${sec("Order", "Log what you ordered with the ticket it was for. An order still open after ten days is flagged Never received, or Part of it never came. Parts that arrive are matched to orders, and anything that came in with no order, or as a swap, is flagged so you can attribute it. Ticket report spreadsheet lists every order and arrival by ticket.")}
+      ${sec("History", "Every entry, newest first. Tap one to see it. A wrong entry has an Undo button, which logs the opposite entry, so the counts go back and nothing is erased from the record.")}
+      ${sec("Count sheets", "In Setup, NV11 count sheet saves the warehouse sheet in its own columns with Actual Count filled in from your stock. Import a count sheet reads a filled in sheet, as a spreadsheet file or CSV, and sets every counted part to the count on the sheet in your default location.")}
+      ${sec("Weekly reports", "Every Friday morning a report of your inventory is made for you: what is on hand by section and location, the change from last week, every entry that week, anything not working or running low, and week over week charts of stock and entries. Open them from Weekly reports in Setup.")}
+      ${sec("Your data", "Signed in, everything saves to your account and matches across your phones. Saves made offline wait on the phone and upload when you are back online, and Setup shows how many are waiting. Only you can see your inventory, photos and reports. Stock CSV and History CSV export everything.")}
+    </div>`);
+  }
+
   async function copyCheckLink() {
     if (!S.user) return toast("Sign in first");
     await claudeSnapshot();
@@ -2208,6 +2229,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       case "load-nv11": return loadNv11();
       case "check-link": return copyCheckLink();
       case "reports": return showReports();
+      case "help": return showHelp();
       case "report-open": return openReport(t.dataset.path);
       case "undo-event": return undoEvent(t.dataset.ev);
       case "export-nv11": return exportNv11();
