@@ -1,5 +1,7 @@
 2026-11-06, v2026.11.06. Added company parts, working and not working counts, and a Count stuff action for taking inventory. The company parts list loads in one tap from Setup, shows in the parts picker with kind and customer filters, and can be exported as a count sheet in the warehouse layout or imported back to set counts. Label photos now match the parts library, and one photo can hold several parts, each matched on its own. Added ticket tracking on orders, Undo for wrong history entries, a read only check link, and weekly inventory reports every Friday morning. Truck is now the default location for parts.
 
+2026-11-07, v2026.11.07. Added a way to log an order from outside the app.
+
 2026-10-21, v2026.10.21. Sign in now also works when handed over from one more Field Twin app. Removed an address from the app.
 
 2026-10-20, v2026.10.20. Added one sign in across the Field Twin apps.
