@@ -11,109 +11,203 @@
 <title>Field Twin Violet</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NiA5NiI+PHJlY3Qgd2lkdGg9Ijk2IiBoZWlnaHQ9Ijk2IiByeD0iMjAiIGZpbGw9IiNlZWY0ZmIiLz48cmVjdCB4PSIyMiIgeT0iMzAiIHdpZHRoPSI1MiIgaGVpZ2h0PSI0MiIgcng9IjYiIGZpbGw9IiMxZjVmYmYiLz48cmVjdCB4PSIyMiIgeT0iMjIiIHdpZHRoPSI1MiIgaGVpZ2h0PSIxNCIgcng9IjUiIGZpbGw9IiM0ZjhmZTYiLz48cmVjdCB4PSI0MCIgeT0iNDQiIHdpZHRoPSIxNiIgaGVpZ2h0PSI2IiByeD0iMyIgZmlsbD0iI2VlZjRmYiIvPjwvc3ZnPgo=" type="image/svg+xml">
 <style>
+  /* Field Twin family look, inventory edition: a parts ledger. White sheets, hairline rules, figures in a
+     fixed width face so columns line up, and blue only where something can be tapped. */
+  @font-face { font-family: 'Overpass'; font-weight: 400; font-display: swap; unicode-range: U+0000-00B6, U+00B8-FFFF; src: url(field-twin-fonts-v1/field-twin-fonts-v1-overpass-400.woff2) format('woff2'); }
+  @font-face { font-family: 'Overpass'; font-weight: 600; font-display: swap; unicode-range: U+0000-00B6, U+00B8-FFFF; src: url(field-twin-fonts-v1/field-twin-fonts-v1-overpass-600.woff2) format('woff2'); }
+  @font-face { font-family: 'Overpass'; font-weight: 800; font-display: swap; unicode-range: U+0000-00B6, U+00B8-FFFF; src: url(field-twin-fonts-v1/field-twin-fonts-v1-overpass-800.woff2) format('woff2'); }
+  @font-face { font-family: 'Overpass Mono'; font-weight: 400; font-display: swap; unicode-range: U+0000-00B1, U+00B3-FFFF; src: url(field-twin-fonts-v1/field-twin-fonts-v1-overpass-mono-400.woff2) format('woff2'); }
+  @font-face { font-family: 'Overpass Mono'; font-weight: 600; font-display: swap; unicode-range: U+0000-00B1, U+00B3-FFFF; src: url(field-twin-fonts-v1/field-twin-fonts-v1-overpass-mono-600.woff2) format('woff2'); }
   :root {
-    --bg: #eef4fb; --card: #ffffff; --line: #cfdcec; --text: #1c2b3d; --muted: #5a6d85;
-    --accent: #1f5fbf; --accent2: #4f8fe6; --ok: #3f7d4e; --warn: #fff0c2; --warnline: #e3b54a;
-    --chip: #e2ecf8; --bad: #fbe0dc; --errtext: #b3261e; --bar: #e3edf9;
+    --paper: #f2f4f7; --surface: #ffffff; --ink: #0b1a2b; --ink2: #44556a; --rule: #c9d2dc; --hair: #e3e8ee;
+    --blue: #0b4ea2; --blue-deep: #083a7a; --wash: #e6eefa; --violet: #5b46c9;
+    --ok: #1b7a43; --ok-wash: #e1f2e7; --amber: #9a5700; --amber-wash: #fdefd3; --red: #b3261e; --red-wash: #fbe5e2;
+    --sans: 'Overpass', 'Segoe UI', Roboto, Arial, sans-serif; --mono: 'Overpass Mono', ui-monospace, Menlo, Consolas, monospace;
+    /* names the script and older rules still use */
+    --bg: var(--paper); --card: var(--surface); --line: var(--rule); --text: var(--ink); --muted: var(--ink2);
+    --accent: var(--blue); --accent2: #5b8fd6; --warn: var(--amber-wash); --warnline: #dba648; --chip: #eef1f5; --bad: var(--red-wash); --errtext: var(--red); --bar: var(--surface);
   }
   * { box-sizing: border-box; }
-  html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  body { padding-bottom: 24px; }
-  .top { position: sticky; top: 0; z-index: 5; background: var(--bar); border-bottom: 2px solid var(--accent); }
-  header { padding: 10px 16px 6px; display: flex; align-items: center; gap: 10px; }
-  header h1 { font-size: 17px; margin: 0; flex: 1; color: var(--accent); }
-  .pill { font-size: 12px; padding: 3px 8px; border-radius: 99px; background: var(--chip); color: var(--muted); white-space: nowrap; }
-  .pill.off { background: var(--bad); color: var(--errtext); }
-  .pill.demo { background: var(--warn); color: #7a5600; }
-  main { padding: 12px 16px; max-width: 760px; margin: 0 auto; }
-  nav { display: flex; overflow-x: auto; padding: 0 8px; }
-  nav[hidden] { display: none; }
-  nav button { flex: 1; border: 0; background: none; padding: 8px 4px 10px; font-size: 14px; color: var(--muted); white-space: nowrap; }
-  nav button.on { color: var(--accent); font-weight: 700; box-shadow: inset 0 -3px 0 var(--accent); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 10px 0; }
-  h2 { font-size: 17px; margin: 18px 0 6px; }
-  h3 { font-size: 15px; margin: 12px 0 4px; }
-  label { display: block; font-size: 13px; color: var(--muted); margin: 8px 0 3px; }
-  input, select, textarea { width: 100%; font: inherit; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--text); }
-  textarea { min-height: 60px; }
-  input.low, select.low { background: var(--warn); border-color: var(--warnline); }
+  html, body { margin: 0; font-variant-ligatures: none; background: var(--paper); color: var(--ink); font: 16px/1.4 var(--sans); font-variant-numeric: tabular-nums; -webkit-text-size-adjust: 100%; }
+  body { padding-bottom: 28px; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  :focus-visible { outline: 3px solid #7fb0f0; outline-offset: 2px; }
+
+  /* top: wordmark bar, the three app tabs, then this app's sections */
+  .top { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 2px solid var(--ink); }
+  header { position: relative; display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 58px 6px 14px; border-bottom: 2px solid var(--ink); }
+  header h1 { margin: 0; flex: 1; min-width: 0; font-size: 17px; font-weight: 800; letter-spacing: 3px; line-height: 1.1; color: var(--ink); white-space: nowrap; }
+  header h1 small { display: block; margin-top: 3px; font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--ink2); }
+  header h1 small i { font-style: normal; color: var(--violet); }
+  #status { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
+  .info-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; padding: 0; border: 2px solid var(--ink); border-radius: 8px; background: var(--surface); color: var(--ink); font: 800 18px var(--sans); }
+  .ft-sites { display: flex; height: 38px; background: var(--surface); border-bottom: 2px solid var(--ink); flex: 0 0 auto; }
+  .ft-sites a { flex: 1; display: flex; align-items: center; justify-content: center; font: 800 14px var(--sans); letter-spacing: .3px; color: var(--ink2); text-decoration: none; }
+  .ft-sites a.on { color: var(--blue); box-shadow: inset 0 -4px 0 var(--ink); }
+  nav#nav { display: flex; overflow-x: auto; padding: 0 6px; scrollbar-width: none; }
+  nav#nav::-webkit-scrollbar { display: none; }
+  nav[hidden] { display: none !important; }
+  nav#nav button { flex: 1 0 auto; border: 0; background: none; padding: 11px 9px 10px; font-size: 14px; font-weight: 600; color: var(--ink2); white-space: nowrap; }
+  nav#nav button.on { color: var(--blue); font-weight: 800; box-shadow: inset 0 -3px 0 var(--blue); }
+  /* inside the Field Twin map app the wordmark and app tabs are already on screen, so only a slim status strip stays */
+  .framed header { min-height: 0; height: 40px; padding: 0 52px 0 12px; border-bottom: 1px solid var(--hair); }
+  .framed header h1 { font-size: 13px; letter-spacing: 0; font-weight: 600; color: var(--ink2); }
+  .framed header h1 b, .framed header h1 small i, .framed .ft-sites, .framed .maplink { display: none; }
+  .framed header h1 small { display: inline; margin: 0; text-transform: capitalize; }
+  .framed .info-btn { width: 30px; height: 30px; font-size: 15px; border-width: 1.5px; }
+
+  main { padding: 14px 14px 8px; max-width: 760px; margin: 0 auto; }
+  h2 { font-size: 15px; font-weight: 800; margin: 22px 0 8px; padding-bottom: 6px; border-bottom: 1px solid var(--rule); letter-spacing: .2px; }
+  main > h2:first-child, .sheet > h2:first-child { margin-top: 2px; }
+  h3 { font-size: 14px; font-weight: 800; margin: 14px 0 6px; color: var(--ink); }
+  p { margin: 6px 0; }
+  .muted { color: var(--ink2); font-size: 13px; }
+  .err { color: var(--red); font-size: 14px; margin: 6px 0; font-weight: 600; }
+  .tap { cursor: pointer; }
+  .mono, .fig { font-family: var(--mono); }
+
+  .card { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 12px 14px; margin: 10px 0; }
+  .card > b:first-child { font-weight: 800; }
+  .card.intro { border-left: 4px solid var(--blue); }
+  .intro .chips { margin-top: 10px; }
+  .conflict { background: var(--red-wash); border-color: #e2a59e; border-left: 4px solid var(--red); }
+
+  /* forms */
+  label { display: block; font-size: 13px; font-weight: 600; color: var(--ink2); margin: 12px 0 4px; }
+  input, select, textarea { width: 100%; min-height: 46px; padding: 10px 11px; border: 1.5px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); }
+  input:focus, select:focus, textarea:focus { border-color: var(--blue); outline: 0; box-shadow: 0 0 0 3px var(--wash); }
+  textarea { min-height: 72px; }
+  input.low, select.low { background: var(--amber-wash); border-color: var(--warnline); }
+  input[type=checkbox], input[type=radio] { width: 22px; height: 22px; min-height: 0; padding: 0; accent-color: var(--blue); }
+  input[type=file] { padding: 8px; }
   .row { display: flex; gap: 8px; }
   .row > * { flex: 1; min-width: 0; }
-  .btn { font: inherit; border: 1px solid var(--line); background: var(--chip); color: var(--text); border-radius: 9px; padding: 10px 14px; }
-  .primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-  .wide { width: 100%; margin-top: 10px; }
-  .small { padding: 5px 9px; font-size: 13px; }
+  .check { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 400; color: var(--ink); margin: 10px 0 0; }
+  .check input { width: 22px; flex: none; }
+
+  /* buttons: blue fill for the one main thing, white with a rule for the rest */
+  .btn { min-height: 46px; padding: 10px 14px; border: 1.5px solid var(--rule); border-radius: 6px; background: var(--surface); color: var(--ink); font-weight: 600; line-height: 1.2; }
+  .btn:active { background: var(--wash); }
+  .primary { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 800; }
+  .primary:active { background: var(--blue-deep); }
+  .wide { width: 100%; margin-top: 12px; }
+  .small { min-height: 36px; padding: 6px 11px; font-size: 13px; }
+  .btn.on, .types button.on { background: var(--ink); border-color: var(--ink); color: #fff; }
   button:disabled { opacity: .5; }
+  label.btn { display: flex; align-items: center; justify-content: center; text-align: center; margin: 0; font-size: 16px; color: var(--ink); }
+  label.btn.primary { color: #fff; }
+  label.btn.wide { margin-top: 12px; }
+  .back { margin: 0 0 4px; border: 0; background: none; padding-left: 0; color: var(--blue); font-weight: 800; }
+  .back::before { content: '\2039'; margin-right: 6px; font-size: 20px; line-height: 0; position: relative; top: 1px; }
   .types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
   .types button { padding: 10px 4px; font-size: 14px; }
-  .types button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .muted { color: var(--muted); font-size: 13px; }
-  .err { color: var(--errtext); font-size: 14px; margin: 6px 0; }
-  .list > div { padding: 10px 0; border-bottom: 1px solid var(--line); }
-  .list > div:last-child { border-bottom: 0; }
-  .tap { cursor: pointer; }
-  .badge { display: inline-block; font-size: 12px; padding: 2px 7px; border-radius: 6px; background: var(--chip); margin-right: 4px; }
-  .b-received { background: #dcefe0; } .b-moved { background: #e6e2f3; } .b-installed { background: #dbe9f4; }
-  .b-pulled { background: #f8d6cf; } .b-returned { background: #f3e6c8; } .b-written_off { background: #e8dcd2; } .b-checked { background: #d4e4f7; }
-  .pill.co { background: #0b4ea2; color: #fff; } .pill.bad { background: #f8d6cf; }
-  .count-row { display: grid; grid-template-columns: 1fr 74px 74px; gap: 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid #e3e8ef; }
-  .count-row input { margin: 0; text-align: center; }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
-  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
-  .tile.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-  .tile b { display: block; font-size: 22px; }
-  .bar { height: 8px; background: var(--accent2); border-radius: 4px; margin-top: 3px; }
-  .conf { font-size: 11px; color: var(--muted); }
-  .conf.low { color: #8a5a00; font-weight: 700; }
-  .thumb { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); background: var(--chip); }
-  .photos { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-  .preview { max-width: 100%; max-height: 260px; border-radius: 10px; display: block; margin: 8px 0; }
-  .conflict { background: var(--bad); border-color: #e9b3aa; }
-  #modal { position: fixed; inset: 0; background: rgba(28, 43, 61, .35); display: none; z-index: 10; overflow: auto; padding: 24px 12px; }
-  #modal.open { display: block; }
-  #modal .sheet { background: var(--bg); border-radius: 14px; max-width: 700px; margin: 0 auto; padding: 14px 16px; }
-  #modal img.full { width: 100%; border-radius: 10px; margin-top: 8px; }
-  #toast { position: fixed; left: 16px; right: 16px; bottom: 24px; background: #fff; border: 1px solid var(--accent2); color: var(--text); padding: 10px 12px; border-radius: 10px; display: none; z-index: 20; text-align: center; }
-  .login { max-width: 420px; margin: 40px auto; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); margin: 0; }
-  .check input { width: auto; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  td { padding: 4px 0; vertical-align: top; }
-  td:last-child { text-align: right; }
-  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .action { font: inherit; text-align: left; background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 10px 12px; color: var(--text); }
-  .action b { display: block; font-size: 16px; color: var(--accent); }
-  .action span { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .intro { border-left: 4px solid var(--accent); }
-  .intro .chips { margin-top: 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
   .pickrow { display: flex; flex-wrap: wrap; gap: 8px; }
   .pickrow > * { flex: 1 1 30%; text-align: center; margin: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; }
-  .item { align-items: center; }
-  .thumbcell { flex: 0 0 72px !important; }
-  .thumb.empty { display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--muted); }
-  img.full { width: 100%; border-radius: 10px; display: block; }
-  .pill.low { background: #fde3cf; color: #9a4a00; font-weight: 700; }
-  .pill.on { background: var(--accent); color: #fff; }
-  .btn.on { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .back { margin: 4px 0 2px; }
-  .maplink { font-size: 13px; font-weight: 700; color: var(--accent); text-decoration: none; border: 1px solid var(--accent2); border-radius: 99px; padding: 4px 10px; background: #fff; white-space: nowrap; }
-  .framed .maplink, .framed .ft-sites { display: none; }
-.ft-sites{display:flex;height:38px;background:#ffffff;border-bottom:2px solid #0a1b2e;flex:0 0 auto}
-  .ft-sites a{flex:1;display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px;font-weight:800;letter-spacing:.3px;color:#5a6d85;text-decoration:none}
-  .ft-sites a.on{color:#0b4ea2;box-shadow:inset 0 -4px 0 #0a1b2e}
+  .maplink { font-size: 13px; font-weight: 800; color: var(--blue); text-decoration: none; }
+
+  /* status marks: small squared tags, color carries meaning and the word says it too */
+  .pill, .badge { display: inline-block; vertical-align: 1px; font-size: 11.5px; font-weight: 800; letter-spacing: .2px; line-height: 1; padding: 4px 7px; border-radius: 4px; background: var(--chip); color: var(--ink2); white-space: nowrap; }
+  .badge { margin-right: 6px; }
+  .pill.off, .pill.bad { background: var(--red-wash); color: var(--red); }
+  .pill.demo, .pill.low { background: var(--amber-wash); color: var(--amber); }
+  .pill.co { background: var(--ink); color: #fff; }
+  .pill.on { background: var(--blue); color: #fff; }
+  .b-received { background: var(--ok-wash); color: var(--ok); } .b-moved { background: #ebe8f8; color: #4a3aa8; } .b-installed { background: var(--wash); color: var(--blue); }
+  .b-pulled { background: var(--red-wash); color: var(--red); } .b-returned { background: var(--amber-wash); color: var(--amber); } .b-written_off { background: #ece7e1; color: #5d4a36; } .b-checked { background: #e2f0f1; color: #0c6a70; }
+
+  /* ledger rows */
+  .list { padding: 0 14px; }
+  .list > div { padding: 12px 0; border-bottom: 1px solid var(--hair); }
+  .list > div:last-child { border-bottom: 0; }
+  .list > div.tap:active { background: var(--wash); margin: 0 -14px; padding-left: 14px; padding-right: 14px; }
+  .list b { font-weight: 800; }
+  .item { align-items: center; gap: 12px; }
+  .thumbcell { flex: 0 0 52px !important; }
+  .thumb { width: 52px; height: 52px; object-fit: cover; border-radius: 4px; border: 1px solid var(--rule); background: var(--chip); display: block; }
+  .thumb.empty { display: flex; align-items: center; justify-content: center; font-size: 10px; line-height: 1.1; text-align: center; color: #8a97a8; }
+  .item .name { font-weight: 800; line-height: 1.25; }
+  .item .pn { font-size: 12.5px; color: var(--ink2); margin-top: 2px; }
+  .item .pn span { font-family: var(--mono); color: var(--ink); margin-right: 8px; }
+  .item .tags { margin-top: 5px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .item .where { margin-top: 4px; }
+  .qtycell { flex: 0 0 auto !important; text-align: right; min-width: 54px; }
+  .qtycell b { display: block; font: 600 22px/1 var(--mono); }
+  .qtycell span { display: block; margin-top: 3px; font-size: 11.5px; color: var(--ink2); }
+  .qtycell.low b { color: var(--amber); }
+  .qtycell.zero b { color: #8a97a8; }
+  .photos { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .photos .thumb { width: 72px; height: 72px; }
+  .preview { max-width: 100%; max-height: 260px; border-radius: 6px; display: block; margin: 8px 0; }
+  img.full { width: 100%; border-radius: 6px; display: block; }
+
+  /* figures */
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+  .kpi { padding: 11px 6px 10px 12px; border-left: 1px solid var(--hair); background: none; border-top: 0; border-right: 0; border-bottom: 0; text-align: left; min-width: 0; }
+  .kpi:first-child { border-left: 0; }
+  .kpi b { display: block; font: 600 26px/1 var(--mono); color: var(--ink); }
+  .kpi span { display: block; margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--ink2); line-height: 1.15; }
+  .kpi.alert b { color: var(--amber); }
+  .kpi.bad b { color: var(--red); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+  .tile { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 10px 12px; font-size: 13px; color: var(--ink2); }
+  .tile.on { border-color: var(--blue); box-shadow: inset 0 0 0 1px var(--blue); }
+  .tile b { display: block; font: 600 24px/1.15 var(--mono); color: var(--ink); margin: 3px 0 2px; }
+  .locs { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; }
+  .loc { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--hair); }
+  .loc:last-child { border-bottom: 0; }
+  .loc:active { background: var(--wash); }
+  .loc div { flex: 1; min-width: 0; }
+  .loc div b { display: block; font-weight: 800; }
+  .loc div span { font-size: 12.5px; color: var(--ink2); }
+  .loc > b { font: 600 20px/1 var(--mono); }
+  .loc > i { font-style: normal; font-size: 12px; color: var(--ink2); min-width: 34px; }
+  .bar { height: 8px; background: var(--blue); border-radius: 2px; margin-top: 4px; }
+  .conf { font-size: 11px; color: var(--ink2); }
+  .conf.low { color: var(--amber); font-weight: 800; }
+  .count-row { display: grid; grid-template-columns: 1fr 74px 74px; gap: 6px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--hair); }
+  .count-row input { margin: 0; text-align: center; font-family: var(--mono); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td { padding: 7px 0; vertical-align: top; border-bottom: 1px solid var(--hair); }
+  tr:last-child td { border-bottom: 0; }
+  td:first-child { color: var(--ink2); padding-right: 12px; }
+  td:last-child { text-align: right; font-weight: 600; }
+
+  /* the log buttons on Home */
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .action { text-align: left; background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 11px 12px 12px; color: var(--ink); min-height: 86px; display: flex; flex-direction: column; }
+  .action:active { background: var(--wash); border-color: var(--blue); }
+  .action b { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 800; color: var(--blue); }
+  .action b::before { content: ''; flex: 0 0 10px; height: 10px; border-radius: 2px; background: var(--blue); }
+  .action[data-start=received] b::before { background: var(--ok); }
+  .action[data-start=moved] b::before { background: #4a3aa8; }
+  .action[data-start=pulled] b::before { background: var(--red); }
+  .action[data-start=returned] b::before { background: var(--amber); }
+  .action[data-start=written_off] b::before { background: #5d4a36; }
+  .action[data-act=count-pick] b::before { background: #0c6a70; }
+  .action:last-child:nth-child(odd) { grid-column: 1 / -1; min-height: 0; }
+  .action span { display: block; font-size: 12.5px; line-height: 1.3; color: var(--ink2); margin-top: 5px; }
+
+  /* overlays */
+  #modal { position: fixed; inset: 0; background: rgba(11, 26, 43, .45); display: none; z-index: 10; overflow: auto; padding: 20px 10px; }
+  #modal.open { display: block; }
+  #modal .sheet { background: var(--surface); border: 2px solid var(--ink); border-radius: 10px; max-width: 700px; margin: 0 auto; padding: 16px 16px 18px; }
+  #modal img.full { margin-top: 8px; }
+  #toast { position: fixed; left: 14px; right: 14px; bottom: 22px; background: var(--ink); color: #fff; font-weight: 600; padding: 12px 14px; border-radius: 8px; display: none; z-index: 20; text-align: center; }
+  .login { max-width: 420px; margin: 28px auto; border-top: 4px solid var(--blue); }
+  .login h2 { border: 0; font-size: 20px; margin: 0 0 4px; padding: 0; }
   #vendorFilter, #customerFilter { margin-top: 8px; }
-  header { position: relative; padding-right: 54px !important; }
-  .info-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border-radius: 50%; border: 2px solid #0b4ea2; background: #fff; color: #0b4ea2; font: italic 800 17px Georgia, serif; cursor: pointer; padding: 0; }
-  .help h3 { color: #0b4ea2; margin: 14px 0 4px; font-size: 15px; }
+  .help h3 { color: var(--blue); margin: 16px 0 4px; font-size: 15px; }
   .help p { margin: 0 0 6px; line-height: 1.45; }
+  @media (max-width: 360px) { .kpi b { font-size: 22px; } .kpi { padding-left: 9px; } }
 </style>
 </head>
 <body>
 <script>if (window.top !== window.self) document.documentElement.classList.add("framed");</script>
 <script src="field-twin-violet-v3-config.js"></script>
 <div class="top">
-<header><h1>Field Twin Violet</h1><span id="status"></span><button class="info-btn" data-act="help" aria-label="How Violet works">i</button></header>
+<header><h1><b>[ FIELD TWIN ]</b><small><i>Violet</i> inventory</small></h1><span id="status"></span><button class="info-btn" data-act="help" aria-label="How Violet works">i</button></header>
 <nav class="ft-sites" aria-label="Field Twin apps"><a href="https://field-twin-teal.vercel.app/#map">Field map</a><a class="on" aria-current="page" href="https://field-twin-violet.vercel.app/">Inventory</a><a href="https://field-twin-glaucous.vercel.app/">Roads</a></nav>
 <nav id="nav" hidden>
   <button data-tab="home">Home</button>
@@ -671,23 +765,25 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       .map((h) => {
         const items = d.byHolder.get(h.id) || [];
         const n = items.reduce((a, it) => a + it.qty, 0);
-        return `<div class="tile tap" data-loc="${h.id}"><span class="muted">${esc(LOC_KINDS[h.kind] || h.kind)}</span><b>${fmtNum(n)}</b>${esc(h.name)}</div>`;
+        return `<div class="loc tap" data-loc="${h.id}"><div><b>${esc(h.name)}</b><span>${esc(LOC_KINDS[h.kind] || h.kind)}</span></div><b>${fmtNum(n)}</b><i>${n === 1 ? "unit" : "units"}</i></div>`;
       })
       .join("");
+    const badKinds = cat.filter((c) => notWorking(d, c.id) > 1e-9).length;
     const conflictCard = d.conflicts.length
       ? `<div class="card conflict tap" data-act="conflicts"><b>${d.conflicts.length} conflict${d.conflicts.length > 1 ? "s" : ""}</b><br><span class="muted">A serial showed up in two places or was installed twice. Tap to see them.</span></div>`
       : "";
     return `${conflictCard}
-      <h2>What happened?</h2>
-      <div class="actions">${actions}<button class="action" data-act="count-pick"><b>Count stuff</b><span>Count a location: how many of each item work and how many do not</span></button></div>
-      <h2>Summary</h2>
-      <div class="tiles">
-        <div class="tile tap" data-tab="items"><span class="muted">Items</span><b>${cat.length}</b>kinds of parts and tools</div>
-        <div class="tile tap" data-tab="order"><span class="muted">To order</span><b>${order.length}</b>running low</div>
-        <div class="tile tap" data-loc="@lockers"><span class="muted">Installed</span><b>${d.lockers.length}</b>at lockers</div>
+      <h2>At a glance</h2>
+      <div class="kpis">
+        <button class="kpi" data-tab="items"><b>${cat.length}</b><span>Items</span></button>
+        <button class="kpi ${order.length ? "alert" : ""}" data-tab="order"><b>${order.length}</b><span>Running low</span></button>
+        <button class="kpi" data-loc="@lockers"><b>${d.lockers.length}</b><span>Installed at lockers</span></button>
+        <button class="kpi ${badKinds ? "bad" : ""}" data-act="own-filter" data-own="bad"><b>${badKinds}</b><span>Not working</span></button>
       </div>
+      <h2>Log what happened</h2>
+      <div class="actions">${actions}<button class="action" data-act="count-pick"><b>Count stuff</b><span>Count a location: how many of each item work and how many do not</span></button></div>
       <h2>Locations</h2>
-      <div class="tiles">${locTiles}</div>`;
+      <div class="locs">${locTiles}</div>`;
   }
 
   // ----- Items -----
@@ -738,11 +834,14 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         const low = Number(c.min_qty) > 0 && have < Number(c.min_qty);
         const photo = c.ref_photo ? `<img class="thumb" data-photo="${esc(c.ref_photo)}" alt="">` : `<div class="thumb empty">No photo</div>`;
         const where = whereText(d, c.id);
+        const tags = `${c.company ? '<span class="pill co">Company</span>' : ""}${c.customer ? '<span class="pill">' + esc(c.customer) + '</span>' : ""}${low ? '<span class="pill low">Low</span>' : ""}${bad > 1e-9 ? '<span class="pill bad">' + fmtNum(bad) + ' not working</span>' : ""}${c._pending ? '<span class="pill">not uploaded yet</span>' : ""}`;
         return `<div class="tap row item" data-catalog="${c.id}">
           <div class="thumbcell">${photo}</div>
-          <div><b>${esc(partLabel(c))}</b>${c.company ? ' <span class="pill co">Company</span>' : ""}${c.customer ? ' <span class="pill">' + esc(c.customer) + '</span>' : ""}${low ? ' <span class="pill low">Low</span>' : ""}${bad > 1e-9 ? ' <span class="pill bad">' + fmtNum(bad) + ' not working</span>' : ""}${c._pending ? ' <span class="pill">not uploaded yet</span>' : ""}<br>
-          <span class="muted">${fmtNum(have)} ${esc(c.unit || "each")} working${where ? " · " + esc(where) : ""}</span><br>
-          <span class="muted">${esc(ITEM_KINDS[c.kind] || c.kind)}${c.vendor ? " · " + esc(c.vendor) : ""}${c.customer ? " · for " + esc(c.customer) : ""}</span></div>
+          <div><div class="name">${esc(c.name || partLabel(c))}</div>
+          <div class="pn">${c.part_number ? `<span>${esc(c.part_number)}</span>` : ""}${esc([ITEM_KINDS[c.kind] || c.kind, c.vendor].filter(Boolean).join(", "))}</div>
+          ${tags ? `<div class="tags">${tags}</div>` : ""}
+          ${where ? `<div class="muted where">${esc(where)}</div>` : ""}</div>
+          <div class="qtycell ${low ? "low" : have <= 0 ? "zero" : ""}"><b>${fmtNum(have)}</b><span>${esc(c.unit || "each")}</span></div>
         </div>`;
       })
       .join("");
@@ -1893,7 +1992,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
     const sec = (t, ...ps) => `<h3>${t}</h3>${ps.map((p) => `<p>${p}</p>`).join("")}`;
     openModal(`<div class="help"><h2>How Violet works</h2>
       ${sec("What it is", "Violet keeps track of every part, tool and consumable you have, where each one sits, and everything that happened to it. Nothing is ever typed over: every change is an entry in History, and the counts are worked out from those entries.")}
-      ${sec("Home", "The What happened buttons log what you did: Add stuff, Move stuff, Installed, Pulled bad part, Sent back, and Used up or tossed. Count stuff counts a location: pick it, type how many of each item work and how many do not, and Violet logs the difference so the counts match the shelf. The tiles show your items, what is running low, what is installed at lockers, and each location.")}
+      ${sec("Home", "The figures at the top show your items, what is running low, what is installed at lockers and what is not working, and tapping one opens that list. The Log what happened buttons record what you did: Add stuff, Move stuff, Installed, Pulled bad part, Sent back, and Used up or tossed. Count stuff counts a location: pick it, type how many of each item work and how many do not, and Violet logs the difference so the counts match the shelf. Locations lists every place your stuff sits with how many units are in it.")}
       ${sec("Adding parts", "In any entry, pick items from the full list, which includes the NV11 company parts list. Filter it by kind, by customer such as Amazon, HP, Otto or hospital, or type words to search. New parts go to your default location, your truck, unless you pick another.", "Take a photo of a part label and the reader finds each part in the photo and matches it to the list by its part number. Several parts in one photo work. When every part in the photo is a sure match, they are all added in one go. When one is not sure, you pick from the closest guesses. If the reader cannot run, the message says why in plain words, such as being out of credit.")}
       ${sec("Items", "Every item with its stock by location. Filter by kind, vendor, customer, company parts, your own, or not working, and search by name, part number or serial. Company parts are marked Company and carry the customer they belong to. Each item has its own page with its photos, where it is, and its history.")}
       ${sec("Working and not working", "Every count is split into working and not working. Parts tracked by serial number are marked one at a time with Works or Does not work on the item page. Pulled bad part logs a failed part with its symptom and cause, and the Failures tab adds those up by part, site, symptom and cause.")}
@@ -2241,7 +2340,7 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       case "count-loc": return countForm(t.dataset.holder);
       case "count-one": return countForm(t.dataset.holder, t.dataset.cat);
       case "serial-test": return serialTest(t);
-      case "own-filter": S.itemCompany = t.dataset.own || ""; return render();
+      case "own-filter": S.itemCompany = t.dataset.own || ""; if (S.tab !== "items") { S.tab = "items"; S.itemId = ""; S.itemLoc = ""; window.scrollTo(0, 0); } return render();
       case "log-back": S.log = null; S.tab = S.itemId ? "items" : "home"; return render();
       case "pick-open": S.log.picking = true; return render();
       case "pick-close": S.log.picking = false; return render();
