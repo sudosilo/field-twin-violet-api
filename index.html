@@ -10,6 +10,7 @@
 <meta name="color-scheme" content="light only">
 <title>Field Twin Violet</title>
 <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NiA5NiI+PHJlY3Qgd2lkdGg9Ijk2IiBoZWlnaHQ9Ijk2IiByeD0iMjAiIGZpbGw9IiNlZWY0ZmIiLz48cmVjdCB4PSIyMiIgeT0iMzAiIHdpZHRoPSI1MiIgaGVpZ2h0PSI0MiIgcng9IjYiIGZpbGw9IiMxZjVmYmYiLz48cmVjdCB4PSIyMiIgeT0iMjIiIHdpZHRoPSI1MiIgaGVpZ2h0PSIxNCIgcng9IjUiIGZpbGw9IiM0ZjhmZTYiLz48cmVjdCB4PSI0MCIgeT0iNDQiIHdpZHRoPSIxNiIgaGVpZ2h0PSI2IiByeD0iMyIgZmlsbD0iI2VlZjRmYiIvPjwvc3ZnPgo=" type="image/svg+xml">
+<script>try{var _n=localStorage.getItem('violetNight'),_h=new Date().getHours();if(_n==='on'||(_n!=='off'&&(_h>=19||_h<6)))document.documentElement.setAttribute('data-theme','night')}catch(e){}</script>
 <style>
   /* Field Twin family look, inventory edition: a parts ledger. White sheets, hairline rules, figures in a
      fixed width face so columns line up, and blue only where something can be tapped. */
@@ -35,16 +36,16 @@
   :focus-visible { outline: 3px solid #7fb0f0; outline-offset: 2px; }
 
   /* top: wordmark bar, the three app tabs, then this app's sections */
-  .top { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 2px solid var(--ink); }
-  header { position: relative; display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 58px 6px 14px; border-bottom: 2px solid var(--ink); }
+  .top { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 2px solid var(--edge); }
+  header { position: relative; display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 6px 58px 6px 14px; border-bottom: 2px solid var(--edge); }
   header h1 { margin: 0; flex: 1; min-width: 0; font-size: 17px; font-weight: 800; letter-spacing: 3px; line-height: 1.1; color: var(--ink); white-space: nowrap; }
   header h1 small { display: block; margin-top: 3px; font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--ink2); }
   header h1 small i { font-style: normal; color: var(--violet); }
   #status { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
-  .info-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; padding: 0; border: 2px solid var(--ink); border-radius: 8px; background: var(--surface); color: var(--ink); font: 800 18px var(--sans); }
-  .ft-sites { display: flex; height: 38px; background: var(--surface); border-bottom: 2px solid var(--ink); flex: 0 0 auto; }
+  .info-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; padding: 0; border: 2px solid var(--edge); border-radius: 8px; background: var(--surface); color: var(--ink); font: 800 18px var(--sans); }
+  .ft-sites { display: flex; height: 38px; background: var(--surface); border-bottom: 2px solid var(--edge); flex: 0 0 auto; }
   .ft-sites a { flex: 1; display: flex; align-items: center; justify-content: center; font: 800 14px var(--sans); letter-spacing: .3px; color: var(--ink2); text-decoration: none; }
-  .ft-sites a.on { color: var(--blue); box-shadow: inset 0 -4px 0 var(--ink); }
+  .ft-sites a.on { color: var(--blue); box-shadow: inset 0 -4px 0 var(--edge); }
   nav#nav { display: flex; overflow-x: auto; padding: 0 6px; scrollbar-width: none; }
   nav#nav::-webkit-scrollbar { display: none; }
   nav[hidden] { display: none !important; }
@@ -93,7 +94,7 @@
   .primary:active { background: var(--blue-deep); }
   .wide { width: 100%; margin-top: 12px; }
   .small { min-height: 36px; padding: 6px 11px; font-size: 13px; }
-  .btn.on, .types button.on { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .btn.on, .types button.on { background: var(--solid); border-color: var(--solid); color: var(--on-solid); }
   button:disabled { opacity: .5; }
   label.btn { display: flex; align-items: center; justify-content: center; text-align: center; margin: 0; font-size: 16px; color: var(--ink); }
   label.btn.primary { color: #fff; }
@@ -112,7 +113,7 @@
   .badge { margin-right: 6px; }
   .pill.off, .pill.bad { background: var(--red-wash); color: var(--red); }
   .pill.demo, .pill.low { background: var(--amber-wash); color: var(--amber); }
-  .pill.co { background: var(--ink); color: #fff; }
+  .pill.co { background: var(--solid); color: var(--on-solid); }
   .pill.on { background: var(--blue); color: #fff; }
   .b-received { background: var(--ok-wash); color: var(--ok); } .b-moved { background: #ebe8f8; color: #4a3aa8; } .b-installed { background: var(--wash); color: var(--blue); }
   .b-pulled { background: var(--red-wash); color: var(--red); } .b-returned { background: var(--amber-wash); color: var(--amber); } .b-written_off { background: #ece7e1; color: #5d4a36; } .b-checked { background: #e2f0f1; color: #0c6a70; }
@@ -190,17 +191,40 @@
   .action span { display: block; font-size: 12.5px; line-height: 1.3; color: var(--ink2); margin-top: 5px; }
 
   /* overlays */
-  #modal { position: fixed; inset: 0; background: rgba(11, 26, 43, .45); display: none; z-index: 10; overflow: auto; padding: 20px 10px; }
+  #modal { position: fixed; inset: 0; background: var(--shade); display: none; z-index: 10; overflow: auto; padding: 20px 10px; }
   #modal.open { display: block; }
-  #modal .sheet { background: var(--surface); border: 2px solid var(--ink); border-radius: 10px; max-width: 700px; margin: 0 auto; padding: 16px 16px 18px; }
+  #modal .sheet { background: var(--surface); border: 2px solid var(--edge); border-radius: 10px; max-width: 700px; margin: 0 auto; padding: 16px 16px 18px; }
   #modal img.full { margin-top: 8px; }
-  #toast { position: fixed; left: 14px; right: 14px; bottom: 22px; background: var(--ink); color: #fff; font-weight: 600; padding: 12px 14px; border-radius: 8px; display: none; z-index: 20; text-align: center; }
+  #toast { position: fixed; left: 14px; right: 14px; bottom: 22px; background: var(--solid); color: var(--on-solid); font-weight: 600; padding: 12px 14px; border-radius: 8px; display: none; z-index: 20; text-align: center; }
   .login { max-width: 420px; margin: 28px auto; border-top: 4px solid var(--blue); }
   .login h2 { border: 0; font-size: 20px; margin: 0 0 4px; padding: 0; }
   #vendorFilter, #customerFilter { margin-top: 8px; }
   .help h3 { color: var(--blue); margin: 16px 0 4px; font-size: 15px; }
   .help p { margin: 0 0 6px; line-height: 1.45; }
   @media (max-width: 360px) { .kpi b { font-size: 22px; } .kpi { padding-left: 9px; } }
+
+  /* ---- night look: dim slate, not black, matching the map app ---- */
+  :root { --edge: var(--ink); --solid: var(--ink); --on-solid: #ffffff; --shade: rgba(11, 26, 43, .45); }
+  :root[data-theme=night] {
+    --paper: #141c27; --surface: #1c2735; --ink: #e8edf4; --ink2: #a9b6c7; --rule: #3a4a61; --hair: #2a374a;
+    --blue: #7db3f5; --blue-deep: #5a97e3; --wash: #26384f; --violet: #a99bf2;
+    --ok: #5fc88a; --ok-wash: #1d3a2b; --amber: #f0b458; --amber-wash: #3a2f1a; --red: #ff8f85; --red-wash: #3a2224;
+    --chip: #26303f; --accent2: #5a97e3; --warnline: #8a6a2a;
+    --edge: #55677f; --solid: #dfe7f1; --on-solid: #0b1a2b; --shade: rgba(0, 0, 0, .55);
+    color-scheme: dark;
+  }
+  :root[data-theme=night] .primary, :root[data-theme=night] label.btn.primary { background: #2f6fcf; border-color: #2f6fcf; color: #ffffff; }
+  :root[data-theme=night] .bar { background: #4d8fe6; }
+  :root[data-theme=night] .conflict { border-color: #6b3a3a; border-left-color: var(--red); }
+  :root[data-theme=night] .b-moved { background: #2d2a4d; color: #b9aef5; }
+  :root[data-theme=night] .b-written_off { background: #3a3128; color: #d8c2a8; }
+  :root[data-theme=night] .b-checked { background: #173538; color: #7fd2d8; }
+  :root[data-theme=night] .action[data-start=moved] b::before { background: #8f80ea; }
+  :root[data-theme=night] .action[data-start=written_off] b::before { background: #b89a78; }
+  :root[data-theme=night] .action[data-act=count-pick] b::before { background: #4fb8c0; }
+  :root[data-theme=night] .thumb.empty { color: #7f8ea3; }
+  :root[data-theme=night] ::placeholder { color: #7f8ea3; }
+  :root[data-theme=night] img.thumb, :root[data-theme=night] img.full, :root[data-theme=night] .preview { filter: brightness(.9); }
 </style>
 </head>
 <body>
@@ -1812,6 +1836,8 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
         ${S.syncError ? `<p class="err">Last upload failed: ${esc(S.syncError)}</p>` : ""}
         <button class="btn" data-act="sync">Upload now</button>`}
       </div>
+      <h2>Display</h2>
+      <div class="card">${FRAMED ? '<p class="muted">Night look follows the Night look button in the map app menu.</p>' : `<label>Night look</label><select id="nightSel"><option value="auto" ${nightMode() === "auto" ? "selected" : ""}>Automatic, on in the evening and overnight</option><option value="on" ${nightMode() === "on" ? "selected" : ""}>Always on</option><option value="off" ${nightMode() === "off" ? "selected" : ""}>Always off</option></select>`}<p class="muted">A dim slate version of the app that is easy on the eyes after dark.</p></div>
       <h2>Weekly reports</h2>
       <div class="card"><button class="btn primary wide" data-act="reports">Open weekly reports</button><p class="muted">A report of your stock, this week's entries and week over week trends is made for you every Friday morning.</p></div>
       <h2>Export</h2>
@@ -2000,9 +2026,32 @@ Resources:`;for(let t of c){if(!t||typeof t!=`string`)throw Error(`@supabase/aut
       ${sec("History", "Every entry, newest first. Tap one to see it. A wrong entry has an Undo button, which logs the opposite entry, so the counts go back and nothing is erased from the record.")}
       ${sec("Count sheets", "In Setup, NV11 count sheet saves the warehouse sheet in its own columns with Actual Count filled in from your stock. Import a count sheet reads a filled in sheet, as a spreadsheet file or CSV, and sets every counted part to the count on the sheet in your default location.")}
       ${sec("Weekly reports", "Every Friday morning a report of your inventory is made for you: what is on hand by section and location, the change from last week, every entry that week, anything not working or running low, and week over week charts of stock and entries. Open them from Weekly reports in Setup.")}
+      ${sec("Night look", "A dim slate version of the app for after dark. Inside the map app it follows the Night look button in the map menu. On its own, set it under Display in Setup to automatic, always on or always off.")}
       ${sec("Your data", "Signed in, everything saves to your account and matches across your phones. Saves made offline wait on the phone and upload when you are back online, and Setup shows how many are waiting. Only you can see your inventory, photos and reports. Stock CSV and History CSV export everything.")}
     </div>`);
   }
+
+  // Night look. Inside the map app it follows the map app, which works from sunset and sunrise where you are.
+  // On its own it follows the clock, on in the evening and overnight, unless set to always on or always off.
+  const FRAMED = window.top !== window.self;
+  let nightFromMap = null;
+  function nightMode() { try { const v = localStorage.getItem("violetNight"); return v === "on" || v === "off" ? v : "auto"; } catch (e) { return "auto"; } }
+  function nightApply() {
+    const h = new Date().getHours() + new Date().getMinutes() / 60, m = nightMode();
+    const on = FRAMED && nightFromMap !== null ? nightFromMap : m === "on" || (m === "auto" && (h >= 19 || h < 6));
+    if (on) document.documentElement.setAttribute("data-theme", "night"); else document.documentElement.removeAttribute("data-theme");
+  }
+  window.addEventListener("message", (ev) => {
+    if (ev.source !== window.parent || !ev.data || typeof ev.data.ftNight !== "boolean") return;
+    nightFromMap = ev.data.ftNight;
+    nightApply();
+  });
+  if (FRAMED) { try { window.parent.postMessage({ ftNightAsk: true }, "*"); } catch (e) {} }
+  nightApply();
+  setInterval(nightApply, 60000);
+  document.addEventListener("change", (ev) => {
+    if (ev.target && ev.target.id === "nightSel") { try { localStorage.setItem("violetNight", ev.target.value); } catch (e) {} nightApply(); }
+  });
 
   async function copyCheckLink() {
     if (!S.user) return toast("Sign in first");
